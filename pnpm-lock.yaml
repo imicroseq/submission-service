@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   '@overture-stack/lyric':
-    specifier: ^0.15.0
-    version: 0.15.0(@types/pg@8.15.4)
+    specifier: ^0.16.0
+    version: 0.16.0(@types/pg@8.15.4)
   bytes:
     specifier: ^3.1.2
     version: 3.1.2
@@ -1003,8 +1003,8 @@ packages:
       zod: 3.23.8
     dev: false
 
-  /@overture-stack/lyric-data-model@0.15.0(@types/pg@8.15.4):
-    resolution: {integrity: sha512-b0HDbw8pmgOYzdFRJ8vPlP6Y+F6KcuHOlu1AukxUDyIkOVcI1D892ndJfPGiIW3M/sjvE4xkeNbxD6Z8J1Br+Q==}
+  /@overture-stack/lyric-data-model@0.16.0(@types/pg@8.15.4):
+    resolution: {integrity: sha512-p6YPFaKsJBWnwqDnhFKzP3BUW1cbW2rvz9Hh5L+XTdx6nrrhnH2aJnnTyHOlQsnc8Qo2n2rhmmBNsUtW5IZ4fw==}
     dependencies:
       '@overture-stack/lectern-client': 2.0.0-beta.5
       copyfiles: 2.4.1
@@ -1037,12 +1037,12 @@ packages:
       - sqlite3
     dev: false
 
-  /@overture-stack/lyric@0.15.0(@types/pg@8.15.4):
-    resolution: {integrity: sha512-hOcmwPxN/lDHWG22K3yMbejk91Sy59ouGhcgFRbOiGO2eiTBeFs3uk5BE3DrXFosPV2F/gXy8x+RqQgRvM+c+A==}
+  /@overture-stack/lyric@0.16.0(@types/pg@8.15.4):
+    resolution: {integrity: sha512-RIS+XkP/VRjUjtvRxeg0tEdEfwtcen1wDLtZa0K/TX43DkO9YNppSscS+48g4TjbeGjhgqF07BtJ1Cyrxh5cOg==}
     engines: {node: '>=20.0.0'}
     dependencies:
       '@overture-stack/lectern-client': 2.0.0-beta.5
-      '@overture-stack/lyric-data-model': 0.15.0(@types/pg@8.15.4)
+      '@overture-stack/lyric-data-model': 0.16.0(@types/pg@8.15.4)
       '@overture-stack/sqon-builder': 1.1.0
       dotenv: 16.4.5
       drizzle-orm: 0.29.5(@types/pg@8.15.4)(pg@8.16.3)
@@ -1746,9 +1746,9 @@ packages:
     resolution: {integrity: sha512-rBMvIzlpA8v6E+SJZoo++HAYqsLrkg7MSfIinMPFhmkorw7X+dOXVJQs+QT69zGkzMyfDnIMN2Wid1+NbL3T+A==}
     engines: {node: '>= 0.4'}
     dependencies:
-      es-define-property: 1.0.0
+      es-define-property: 1.0.1
       es-errors: 1.3.0
-      gopd: 1.0.1
+      gopd: 1.2.0
     dev: false
 
   /delayed-stream@1.0.0:
@@ -2015,7 +2015,7 @@ packages:
     resolution: {integrity: sha512-jxayLKShrEqqzJ0eumQbVhTYQM27CfT1T35+gCgDFoL82JLsXqTJ76zv6A0YLOgEnLUMvLzsDsGIrl8NFpT2gQ==}
     engines: {node: '>= 0.4'}
     dependencies:
-      get-intrinsic: 1.2.4
+      get-intrinsic: 1.3.0
     dev: false
 
   /es-define-property@1.0.1:
@@ -2613,7 +2613,7 @@ packages:
   /gopd@1.0.1:
     resolution: {integrity: sha512-d65bNlIadxvpb/A2abVdlqKqV563juRnZ1Wtk6s1sIR8uNsXR70xqIzVqxVf1eTqDunwT2MkczEeaezCKTZhwA==}
     dependencies:
-      get-intrinsic: 1.2.4
+      get-intrinsic: 1.3.0
     dev: false
 
   /gopd@1.2.0:
@@ -2633,7 +2633,7 @@ packages:
   /has-property-descriptors@1.0.2:
     resolution: {integrity: sha512-55JNKuIW+vq4Ke1BjOTjM2YctQIvCT7GFzHwmfZPGo5wnrgkid0YQtnAleFSqumZm4az3n2BS+erby5ipJdgrg==}
     dependencies:
-      es-define-property: 1.0.0
+      es-define-property: 1.0.1
     dev: false
 
   /has-proto@1.0.3:
@@ -3573,7 +3573,7 @@ packages:
       define-data-property: 1.1.4
       es-errors: 1.3.0
       function-bind: 1.1.2
-      get-intrinsic: 1.2.4
+      get-intrinsic: 1.3.0
       gopd: 1.0.1
       has-property-descriptors: 1.0.2
     dev: false
