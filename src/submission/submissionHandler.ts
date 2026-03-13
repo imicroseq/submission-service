@@ -17,7 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { BATCH_ERROR_TYPE, type BatchError, CREATE_SUBMISSION_STATUS, type Schema } from '@overture-stack/lyric';
+import { ACTIVE_SUBMISSION_STATUS, BATCH_ERROR_TYPE, type BatchError, type Schema } from '@overture-stack/lyric';
 
 import { env } from '@/common/envConfig.js';
 import logger from '@/common/logger.js';
@@ -247,7 +247,7 @@ export async function handleSubmission({
 		username,
 	});
 
-	if (lyricSubmitResult.status !== CREATE_SUBMISSION_STATUS.PROCESSING || !lyricSubmitResult.submissionId) {
+	if (lyricSubmitResult.status !== ACTIVE_SUBMISSION_STATUS.PROCESSING || !lyricSubmitResult.submissionId) {
 		return {
 			success: false,
 			errors: [

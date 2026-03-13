@@ -28,7 +28,7 @@
       200:
         description: Submission information
         content:
-          application/json:
+          text/event-stream::
             schema:
               allOf:
                 - $ref: '#/components/schemas/SubmissionResult'

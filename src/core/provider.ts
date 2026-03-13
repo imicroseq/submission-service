@@ -56,6 +56,9 @@ const appConfig: AppConfig = {
 	schemaService: {
 		url: env.LECTERN_URL,
 	},
+	submissionService: {
+		maxFileSize: 10000000, // 10MB default max file size for submission service, can be overridden by env variable
+	},
 	validator: [],
 };
 

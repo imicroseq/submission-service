@@ -19,7 +19,7 @@
 
 import { type Response } from 'express';
 
-import { type BatchError, CREATE_SUBMISSION_STATUS } from '@overture-stack/lyric';
+import { ACTIVE_SUBMISSION_STATUS, type BatchError } from '@overture-stack/lyric';
 
 import { hasUserWriteAccess, shouldBypassAuth } from '@/common/auth.js';
 import logger from '@/common/logger.js';
@@ -141,7 +141,7 @@ const respondWithInvalidSubmission = (
 ): Response<SubmitResponse> => {
 	return res.status(200).send({
 		submissionId,
-		status: CREATE_SUBMISSION_STATUS.INVALID_SUBMISSION,
+		status: ACTIVE_SUBMISSION_STATUS.INVALID_SUBMISSION,
 		submissionManifest: [],
 		batchErrors: errors,
 	});
@@ -160,7 +160,7 @@ const responseWithProcessingStatus = (
 ): Response<SubmitResponse> => {
 	return res.status(200).send({
 		submissionId,
-		status: CREATE_SUBMISSION_STATUS.PROCESSING,
+		status: ACTIVE_SUBMISSION_STATUS.PROCESSING,
 		submissionManifest: submissionManifest || [],
 		batchErrors: [],
 	});
