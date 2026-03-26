@@ -61,6 +61,7 @@
       - Submission
     parameters:
       - $ref: '#/components/parameters/path/SubmissionId'
+      - $ref: '#/components/parameters/query/ForceDeleteSubmission'
     responses:
       200:
         description: Submission closed successfully
