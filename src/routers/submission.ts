@@ -42,6 +42,10 @@ export const submissionRouter: Router = (() => {
 	router.post('/category/:categoryId/commit/:submissionId', authMiddleware, commit);
 	router.put('/category/:categoryId/data', authMiddleware, upload.array('files'), editData);
 
+	router.post('/category/:categoryId/files', (req, res) => {
+		// The endpoint for files upload provided by Lyric should be disabled.
+		res.status(404).send();
+	});
 	router.use('', lyricProvider.routers.submission);
 	router.use(errorHandler);
 
