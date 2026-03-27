@@ -55,6 +55,7 @@ export type GetSubmissionResponse = {
 /**
  * Polling configuration constants
  */
+// TODO: abstract these as external configs. e.g. env vars
 const POLLING_INTERVAL_MS = 3000; // Send status update every 3 seconds
 const STALE_SUBMISSION_THRESHOLD_MS = 600000; // 10 minutes - stop polling if submission hasn't been updated
 const POLLING_MAX_DURATION_MS = 600000; // 10 minutes - maximum time to keep polling active
