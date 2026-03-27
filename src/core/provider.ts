@@ -57,7 +57,7 @@ const appConfig: AppConfig = {
 		url: env.LECTERN_URL,
 	},
 	submissionService: {
-		maxFileSize: 10000000, // 10MB default max file size for submission service, can be overridden by env variable
+		maxFileSize: 0, // Set to 0 to disable file size limit in lyricProvider
 	},
 	validator: [],
 };
