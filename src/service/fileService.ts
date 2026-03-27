@@ -43,7 +43,7 @@ export const fetchSubmissionFilesBySubmissionId = async (submissionId: number) =
 	const db = getDbInstance();
 	const { getSubmissionFilesBySubmissionId } = fileRepository(db);
 	const submissionFiles = await getSubmissionFilesBySubmissionId(submissionId);
-	logger.info(`Found '${submissionFiles.length}' files for Submission '${submissionId}'`);
+	logger.debug(`Found '${submissionFiles.length}' files for Submission '${submissionId}'`);
 	return submissionFiles;
 };
 

@@ -28,7 +28,7 @@
       200:
         description: Submission information
         content:
-          application/json:
+          text/event-stream::
             schema:
               allOf:
                 - $ref: '#/components/schemas/SubmissionResult'
@@ -61,6 +61,7 @@
       - Submission
     parameters:
       - $ref: '#/components/parameters/path/SubmissionId'
+      - $ref: '#/components/parameters/query/ForceDeleteSubmission'
     responses:
       200:
         description: Submission closed successfully

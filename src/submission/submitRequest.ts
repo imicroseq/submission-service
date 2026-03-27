@@ -21,7 +21,7 @@ import type { ParamsDictionary } from 'express-serve-static-core';
 import type { ParsedQs } from 'qs';
 import { z, ZodError } from 'zod';
 
-import type { BatchError } from '@overture-stack/lyric';
+import type { ActiveSubmissionStatus, BatchError } from '@overture-stack/lyric';
 
 import logger from '@/common/logger.js';
 import type { RequestValidation } from '@/middleware/requestValidation.js';
@@ -93,11 +93,6 @@ export const submitRequestSchema: RequestValidation<
 	}),
 };
 
-export const CREATE_SUBMISSION_STATUS = {
-	PROCESSING: 'PROCESSING',
-	INVALID_SUBMISSION: 'INVALID_SUBMISSION',
-} as const;
-
 export type ErrorResponse = {
 	error: string;
 	message: string;
@@ -111,7 +106,7 @@ export type SubmissionManifest = {
 
 export type SubmitResponse = {
 	submissionId?: number;
-	status: 'PROCESSING' | 'INVALID_SUBMISSION';
+	status: ActiveSubmissionStatus;
 	submissionManifest: SubmissionManifest[];
 	batchErrors: BatchError[];
 };

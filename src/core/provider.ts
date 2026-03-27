@@ -56,6 +56,9 @@ const appConfig: AppConfig = {
 	schemaService: {
 		url: env.LECTERN_URL,
 	},
+	submissionService: {
+		maxFileSize: 0, // Set to 0 to disable file size limit in lyricProvider
+	},
 	validator: [],
 };
 

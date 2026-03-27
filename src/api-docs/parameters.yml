@@ -40,6 +40,13 @@ components:
           type: string
         description: The ID of the Submission
     query:
+      ForceDeleteSubmission:
+        description: Optional query parameter to force the deletion of a submission. Default value is false
+        name: force
+        in: query
+        schema:
+          type: boolean
+        required: false
       OnlyActive:
         description: Optional query parameter to filter results to include only active submissions. Default value is false
         name: onlyActive

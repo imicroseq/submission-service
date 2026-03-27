@@ -478,7 +478,7 @@ components:
         status:
           type: string
           description: Status of the Submission
-          enum: ['OPEN', 'VALID', 'INVALID', 'CLOSED', 'COMMITTED']
+          enum: ['OPEN', 'VALIDATING', 'VALID', 'INVALID', 'CLOSED', 'COMMITTING', 'COMMITTED']
         createdAt:
           type: string
           description: Date and time of creation
