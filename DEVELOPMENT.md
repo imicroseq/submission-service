@@ -44,7 +44,10 @@
 
 ## Running tests
 
-No automated test suite exists in this repository yet (no `*.test.ts`/`*.spec.ts` files, no test script in `package.json`). New and changed code should follow the co-located, BDD-style `node:test` convention described in `CLAUDE.md`/`AGENTS.md` § Testing; see `.dev/tech-debt.md` for the standing gap.
+- `pnpm test` runs co-located `*.test.ts` files with Node's built-in test runner (`node:test`), transpiled on the fly via `tsx`
+- New and changed code follows the co-located, BDD-style `node:test` convention described in `CLAUDE.md`/`AGENTS.md` § Testing
+- Uses `.env.test` (committed, non-secret placeholder values, loaded via `--env-file`), not your local `.env`: most modules parse environment configuration at import time, so importing them at all fails without some valid values present, real or not. Keep pure business logic in modules that don't import `@/core/provider.js` (see `.dev/tech-debt.md`): importing it, directly or transitively, hangs a test run indefinitely without a live Postgres connection
+- The DB/Song-facing submission orchestration and Express controllers aren't covered yet; see `.dev/tech-debt.md` for what that would take
 
 ## Working documents
 
@@ -53,6 +56,6 @@ The `.dev/` directory contains living documents maintained alongside the codebas
 - `.dev/roadmap.md`: planned features and architectural direction; read at session start
 - `.dev/tech-debt.md`: known issues, scope-adjacent problems, and deferred work
 - `.dev/sessions/`: one file per contributor per day (`YYYY-MM-DDTHHMMSS.md`), brief log of what changed and why
-- `.dev/docs/`: service-specific deployment notes and operational guides; indexed at `.dev/docs/index.md`; one subdirectory per service (e.g. `.dev/docs/postgres/`, `.dev/docs/lectern/`)
+- `.dev/docs/`: internal design rationale and implementation guides (e.g. `.dev/docs/submission/`), plus service-specific deployment notes and operational guides (e.g. `.dev/docs/postgres/`, `.dev/docs/lectern/`); indexed at `.dev/docs/index.md`
 
 Read the `.dev/` files at the start of each session before beginning work. Read the relevant `.dev/docs/<service>/` guide before deploying or debugging a specific service. Update these at the end of any session that produces meaningful output.
