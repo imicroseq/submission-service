@@ -4,7 +4,7 @@
 
 ## Why this exists
 
-Sequencing files often arrive after their clinical data file: an operator submits clinical records first, then sequencing files for those same records once they're available. Before this change, every submission required a file, so attaching sequencing files to an already-submitted set of records meant re-uploading the original clinical data file just to carry sequencing metadata alongside it.
+Sequencing files often arrive after their clinical data file: an operator may submit clinical records together with some of the sequencing files for those same records. Before this change, every submission required a .csv file along with its sequencing files, and it was not possible to append sequencing files to records that had already been submitted.
 
 ## How it works
 
