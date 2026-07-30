@@ -66,13 +66,11 @@ export const submit = validateRequest(
 						'The "submissionFile" parameter is missing or empty. Please include a file in the request for processing.',
 					);
 				}
-				const activeSubmission = sequencingMetadataValues
-					? await lyricProvider.services.submission.getActiveSubmissionByOrganization({
-							categoryId,
-							username: user?.username || '',
-							organization,
-						})
-					: undefined;
+				const activeSubmission = await lyricProvider.services.submission.getActiveSubmissionByOrganization({
+					categoryId,
+					username: user?.username || '',
+					organization,
+				});
 
 				if (!activeSubmission) {
 					throw new lyricProvider.utils.errors.BadRequest(
