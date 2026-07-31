@@ -79,6 +79,7 @@ WORKDIR ${WORKDIR}
 
 COPY --from=prod-deps ${WORKDIR}/node_modules ./node_modules
 COPY --from=build ${WORKDIR}/dist .
+COPY --from=build ${WORKDIR}/pnpm-lock.yaml ./pnpm-lock.yaml
 
 EXPOSE 3000
 
