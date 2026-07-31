@@ -19,3 +19,7 @@ standalone: yes
 `buildSequencingFilesMetadata` (`src/submission/fileValidation.ts`) reads `env.SEQUENCING_SUBMISSION_FILENAME_IDENTIFIER_COLUMN` directly instead of receiving it as a parameter, violating this project's own "library code must not read from the environment" constraint and blocking a clean, deterministic unit test of its env-dependent branches
 fix: thread the identifier column through as a function parameter (the caller already reads it from `env` once), the same way `fileNameIdentifier` is already passed into `buildSongSubmissionPayload`
 standalone: yes
+
+`handleSequencingMetadataSubmission` (`src/submission/submissionHandler.ts`) fetches a Submission's clinical records via `getSubmissionDetailsById` with `pageSize` set to the full record count, i.e. one unbounded query per append call. Raised during review of the sequencing-metadata-append feature since it's the same class of problem ("large submission") that motivates this feature in the first place. Per Lyric's current storage model, this isn't actually fixable here: Lyric stores a Submission's data as a single JSONB column, so there's no partial-fetch to page or stream against
+fix: revisit once the Lyric dependency ships the version that gives more granular control over Submission data storage; until then there's no code change to make on this side
+standalone: yes
