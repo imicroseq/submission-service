@@ -12,6 +12,7 @@
     "\n=============  Dev environment  =============": "",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
     "db:studio": "NODE_OPTIONS='--import tsx' drizzle-kit studio --config=drizzle.config.ts",
     "db:generate": "NODE_OPTIONS='--import tsx' drizzle-kit generate --config=drizzle.config.ts",
     "migrate:db:dev": "tsx src/scripts/provider-migration.ts && tsx src/scripts/custom-migration.ts",

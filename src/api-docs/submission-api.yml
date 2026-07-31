@@ -231,6 +231,11 @@
 /submission/category/{categoryId}/data:
   post:
     summary: Add new data to a submission for the specified category. Returns an Active Submission containing the newly created records
+    description: >
+      `submissionFile` may be omitted if the caller already has an Active Submission for `organization`
+      and `sequencingMetadata` is provided: the given sequencing files are attached to that existing
+      Active Submission instead of creating a new Submission. Returns `400` if `submissionFile` is omitted and there is no Active Submission, or no
+      `sequencingMetadata` is provided.
     tags:
       - Submission
     consumes:
@@ -246,7 +251,10 @@
               submissionFile:
                 type: string
                 format: binary
-                description: 'The main file containing data records for submission (supported formats: CSV, TSV)'
+                description: >
+                  The main file containing data records for submission (supported formats: CSV, TSV).
+                  Optional when the caller already has an Active Submission for the organization and
+                  `sequencingMetadata` is provided; see the endpoint description.
               entityName:
                 type: string
                 default: ''
@@ -260,7 +268,6 @@
                 description: JSON string representing an array of Metadata for sequencing files. <br />(e.g. '[{"fileName":"SRS00001-ABC123.tar.xz","fileSize":"100", "fileMd5sum":"ABC123", "fileAccess":"open", "fileType":"FASTAQ"}]')
                 default: ''
             required:
-              - submissionFile
               - entityName
               - organization
     responses:

@@ -26,7 +26,7 @@ import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { validateRequest } from '@/middleware/requestValidation.js';
 import { prevalidateNewDataFile } from '@/submission/fileValidation.js';
-import { handleSubmission } from '@/submission/submissionHandler.js';
+import { handleSequencingMetadataSubmission, handleSubmission } from '@/submission/submissionHandler.js';
 import {
 	type ErrorResponse,
 	type SubmissionManifest,
@@ -61,9 +61,35 @@ export const submit = validateRequest(
 			}
 
 			if (!submissionFile) {
-				throw new lyricProvider.utils.errors.BadRequest(
-					'The "submissionFile" parameter is missing or empty. Please include a file in the request for processing.',
-				);
+				if (!sequencingMetadataValues || sequencingMetadataValues.length === 0) {
+					throw new lyricProvider.utils.errors.BadRequest(
+						'The "submissionFile" parameter is missing or empty. Please include a file in the request for processing.',
+					);
+				}
+				const activeSubmission = await lyricProvider.services.submission.getActiveSubmissionByOrganization({
+					categoryId,
+					username: user?.username || '',
+					organization,
+				});
+
+				if (!activeSubmission) {
+					throw new lyricProvider.utils.errors.BadRequest(
+						'No active submission found for the provided organization and category. Please ensure that you have an active submission before submitting sequencing metadata.',
+					);
+				}
+
+				const result = await handleSequencingMetadataSubmission({
+					activeSubmission,
+					sequencingMetadataValues,
+					organization,
+					entityName,
+				});
+
+				if (!result.success) {
+					return respondWithInvalidSubmission(res, result.submissionId, result.errors || []);
+				}
+
+				return responseWithProcessingStatus(res, result.submissionId, result.submissionManifest);
 			}
 
 			// Get the current dictionary and validate entity name

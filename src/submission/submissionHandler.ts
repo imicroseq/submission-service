@@ -17,20 +17,27 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { ACTIVE_SUBMISSION_STATUS, BATCH_ERROR_TYPE, type BatchError, type Schema } from '@overture-stack/lyric';
+import {
+	ACTIVE_SUBMISSION_STATUS,
+	BATCH_ERROR_TYPE,
+	type BatchError,
+	type Schema,
+	type SubmissionSummary,
+} from '@overture-stack/lyric';
 
 import { env } from '@/common/envConfig.js';
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { type InsertSubmissionFile } from '@/db/schemas/index.js';
+import { buildSubmissionFileMetadata } from '@/service/fileService.js';
 import { getAnalysisFilesByAnalysisId, submit as songSubmit } from '@/submission/song.js';
 import type { SequencingMetadataType, SubmissionManifest } from '@/submission/submitRequest.js';
 
 import { getDbInstance } from '../db/index.js';
 import { fileRepository } from '../repository/fileRepository.js';
-import { buildFileMetadata, buildSequencingFilesMetadata } from './fileValidation.js';
-import { convertRecordToPayload, prefixKeys } from './populateTemplate.js';
+import { buildSequencingFilesMetadata } from './fileValidation.js';
 import { parseFileToRecords } from './readFile.js';
+import { buildSongSubmissionPayload, extractInsertRecordValues } from './sequencingPayload.js';
 
 interface SuccessSubmissionResult {
 	success: true;
@@ -43,45 +50,6 @@ interface ErrorSubmissionResult {
 	submissionId?: number;
 	errors: BatchError[];
 }
-
-// This template is used to convert the sequencing metadata into a payload to Song
-const SEQUENCING_TEMPLATE = 'sequencing_payload.json' as const;
-const DATA_PREFIX = 'data.' as const;
-
-/**
- * Builds the Song payload based on the Sequencing files Metadata
- * @param param0
- * @returns
- */
-const buildSongSubmissionPayload = ({
-	sequencingFilesMetadata,
-	extractedData,
-	organization,
-	fileNameIdentifier,
-}: {
-	sequencingFilesMetadata: (SequencingMetadataType & { identifier: string })[];
-	extractedData: Record<string, string>[];
-	organization: string;
-	fileNameIdentifier: string;
-}): Record<string, any>[] => {
-	const songSubmissionData: Record<string, any>[] = [];
-	// Convert Sequencing metadata to payload
-	for (const filesMetadata of sequencingFilesMetadata) {
-		const matchedRecord = extractedData.find((record) => record[fileNameIdentifier] === filesMetadata.identifier);
-
-		if (!matchedRecord) {
-			continue;
-		}
-
-		const prefixedRecord = prefixKeys(matchedRecord, DATA_PREFIX);
-		const songPayload = convertRecordToPayload({ organization, ...prefixedRecord }, SEQUENCING_TEMPLATE);
-		// TODO: Handle multiple files by same identifier
-		songPayload.files = [buildFileMetadata(filesMetadata)];
-
-		songSubmissionData.push(songPayload);
-	}
-	return songSubmissionData;
-};
 
 /**
  * Constructs an array of data to be used for the file Manifest
@@ -110,7 +78,7 @@ const buildSubmissionManifest = async (analysisIds: string[], organization: stri
  * @param organization
  * @param submissionId
  * @param fileNameIdentifier
- * @param submissionFile
+ * @param batchName Name used to identify the batch in error reporting
  * @returns
  */
 const submitSongPayload = async (
@@ -118,7 +86,7 @@ const submitSongPayload = async (
 	organization: string,
 	submissionId: number,
 	fileNameIdentifier: string,
-	submissionFile: Express.Multer.File,
+	batchName: string,
 ): Promise<{ success: true; analysisIds: string[] } | ErrorSubmissionResult> => {
 	const db = getDbInstance();
 	const fileRepo = fileRepository(db);
@@ -141,7 +109,7 @@ const submitSongPayload = async (
 			songErrors.push({
 				message: error?.toString() || 'Unknown error',
 				type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
-				batchName: submissionFile.originalname,
+				batchName,
 			});
 		}
 	}
@@ -172,7 +140,7 @@ const submitSongPayload = async (
 				{
 					message: error?.toString() || 'Unknown error',
 					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
-					batchName: submissionFile.originalname,
+					batchName,
 				},
 			],
 		};
@@ -269,7 +237,7 @@ export async function handleSubmission({
 		organization,
 		lyricSubmitResult.submissionId,
 		fileNameIdentifier,
-		submissionFile,
+		submissionFile.originalname,
 	);
 
 	if (!songSubmissionResult.success) {
@@ -291,5 +259,112 @@ export async function handleSubmission({
 		success: true,
 		submissionId: lyricSubmitResult.submissionId,
 		submissionManifest: manifest,
+	};
+}
+
+/**
+ * Handles submission of sequencing metadata against an already active Submission,
+ * with no new submission file. Matches the provided sequencing metadata against the
+ * clinical records already staged on the active Submission and submits the resulting
+ * payload(s) to Song.
+ * @param param0
+ * @returns
+ */
+export async function handleSequencingMetadataSubmission({
+	activeSubmission,
+	sequencingMetadataValues,
+	organization,
+	entityName,
+}: {
+	activeSubmission: SubmissionSummary;
+	sequencingMetadataValues: SequencingMetadataType[];
+	organization: string;
+	entityName: string;
+}): Promise<SuccessSubmissionResult | ErrorSubmissionResult> {
+	const fileNameIdentifier = env.SEQUENCING_SUBMISSION_FILENAME_IDENTIFIER_COLUMN || '';
+	const sequencingEnabled = env.SEQUENCING_SUBMISSION_ENABLED;
+	const submissionId = activeSubmission.id;
+	const batchName = `Submission ${submissionId}`;
+
+	if (!fileNameIdentifier || !sequencingEnabled) {
+		return {
+			success: false,
+			submissionId,
+			errors: [
+				{
+					message: 'Sequencing file submission is not enabled for this category.',
+					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+					batchName,
+				},
+			],
+		};
+	}
+
+	// Grab the clinical records already staged on the active Submission to match against the sequencing metadata
+	const { data: submissionRecords } = await lyricProvider.services.submission.getSubmissionDetailsById({
+		submissionId,
+		paginationOptions: { page: 1, pageSize: Math.max(activeSubmission.data.total, 1) },
+		filterOptions: { entityNames: [entityName], actionTypes: ['INSERTS'] },
+	});
+
+	const extractedData = extractInsertRecordValues(submissionRecords);
+
+	const { errors, validFiles: sequencingFilesMetadata } = buildSequencingFilesMetadata(
+		sequencingMetadataValues,
+		extractedData,
+		batchName,
+	);
+
+	if (errors.length > 0) {
+		logger.info(`Error validation sequencing file metadata: ${JSON.stringify(errors)}`);
+		return { success: false, submissionId, errors };
+	}
+
+	const songSubmissionData = buildSongSubmissionPayload({
+		sequencingFilesMetadata,
+		extractedData,
+		organization,
+		fileNameIdentifier,
+	});
+
+	if (!songSubmissionData.length) {
+		return {
+			success: false,
+			submissionId,
+			errors: [
+				{
+					message: 'No sequencing files matched the records of the current active Submission.',
+					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+					batchName,
+				},
+			],
+		};
+	}
+
+	const songSubmissionResult = await submitSongPayload(
+		songSubmissionData,
+		organization,
+		submissionId,
+		fileNameIdentifier,
+		batchName,
+	);
+
+	if (!songSubmissionResult.success) {
+		return songSubmissionResult;
+	}
+
+	// Combine the Submission's existing files with the newly submitted sequencing files
+	const existingFiles = await buildSubmissionFileMetadata(organization, submissionId);
+	const newFiles = await buildSubmissionManifest(songSubmissionResult.analysisIds, organization);
+
+	const submissionManifest: SubmissionManifest[] = [
+		...existingFiles.map(({ objectId, fileName, md5Sum }) => ({ objectId, fileName, md5Sum })),
+		...newFiles,
+	];
+
+	return {
+		success: true,
+		submissionId,
+		submissionManifest,
 	};
 }

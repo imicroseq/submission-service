@@ -6,7 +6,7 @@ ARG WORKDIR=/usr/src/app
 ######################
 # Configure base image
 ######################
-FROM node:20.12.2-alpine AS base
+FROM node:22-alpine AS base
 
 ARG APP_USER
 ARG WORKDIR
@@ -14,15 +14,16 @@ ARG WORKDIR
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
 
-# install pnpm as root user, before updating node ownership
-RUN npm i -g pnpm
-
 # create our own user to run node, don't run node in production as root
 ENV APP_UID=9999
 ENV APP_GID=9999
 RUN addgroup -S -g $APP_GID $APP_USER \
 	&& adduser -S -u $APP_UID -g $APP_GID $APP_USER \
 	&& mkdir -p ${WORKDIR}
+
+ENV COREPACK_HOME=/usr/local/share/corepack
+RUN corepack enable
+RUN corepack prepare pnpm@11.1.1 --activate
 
 WORKDIR ${WORKDIR}
 
@@ -34,14 +35,15 @@ USER ${APP_USER}:${APP_USER}
 # Configure build image
 ######################
 
-FROM base as build
+FROM base AS build
 
 ARG APP_USER
 ARG WORKDIR
 
-COPY --chown=clinical:clinical . ./
+COPY --chown=${APP_USER}:${APP_USER} . ./
+USER ${APP_USER}:${APP_USER}
 
-RUN pnpm install --ignore-scripts
+RUN pnpm install --ignore-scripts --frozen-lockfile
 
 RUN pnpm build:all
 
