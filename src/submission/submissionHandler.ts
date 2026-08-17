@@ -263,6 +263,21 @@ export async function handleSubmission({
 }
 
 /**
+ * Finds duplicate files in the sequencing metadata values based on their md5sum
+ */
+const findDuplicateSequencingMetadata = (
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] => {
+	const metadataFileNamesByMd5sum = sequencingMetadataValues.reduce(
+		(fileNamesByMd5sum, metadata) =>
+			fileNamesByMd5sum.set(metadata.fileMd5sum, [...(fileNamesByMd5sum.get(metadata.fileMd5sum) ?? []), metadata]),
+		new Map<string, SequencingMetadataType[]>(),
+	);
+
+	return [...metadataFileNamesByMd5sum.values()].filter((files) => files.length > 1).flat();
+};
+
+/**
  * Handles submission of sequencing metadata against an already active Submission,
  * with no new submission file. Matches the provided sequencing metadata against the
  * clinical records already staged on the active Submission and submits the resulting
@@ -293,6 +308,43 @@ export async function handleSequencingMetadataSubmission({
 			errors: [
 				{
 					message: 'Sequencing file submission is not enabled for this category.',
+					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+					batchName,
+				},
+			],
+		};
+	}
+
+	// Input validation - Find duplicate md5sums in senquencing metadata input
+	const duplicateMetadataFiles = findDuplicateSequencingMetadata(sequencingMetadataValues);
+
+	if (duplicateMetadataFiles.length) {
+		return {
+			success: false,
+			submissionId,
+			errors: [
+				{
+					message: `The following files have duplicate md5sum values: ${duplicateMetadataFiles.map((metadata) => metadata.fileName).join(', ')}`,
+					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+					batchName,
+				},
+			],
+		};
+	}
+
+	// Submission valiation - Find any duplicates againt submisison file metadata
+	const existingFiles = await buildSubmissionFileMetadata(organization, submissionId);
+	const alreadySubmittedFiles = sequencingMetadataValues.filter((metadata) =>
+		existingFiles.find((existing) => existing.md5Sum === metadata.fileMd5sum),
+	);
+
+	if (alreadySubmittedFiles.length) {
+		return {
+			success: false,
+			submissionId,
+			errors: [
+				{
+					message: `The following files have already been submitted for this submission: ${alreadySubmittedFiles.map((file) => file.fileName).join(', ')}`,
 					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
 					batchName,
 				},
@@ -354,7 +406,6 @@ export async function handleSequencingMetadataSubmission({
 	}
 
 	// Combine the Submission's existing files with the newly submitted sequencing files
-	const existingFiles = await buildSubmissionFileMetadata(organization, submissionId);
 	const newFiles = await buildSubmissionManifest(songSubmissionResult.analysisIds, organization);
 
 	const submissionManifest: SubmissionManifest[] = [
