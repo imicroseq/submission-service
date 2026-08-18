@@ -269,13 +269,12 @@ export async function handleSubmission({
 export const findDuplicateSequencingMetadata = (
 	sequencingMetadataValues: SequencingMetadataType[],
 ): SequencingMetadataType[] => {
-	const metadataFileNamesByMd5sum = sequencingMetadataValues.reduce(
-		(fileNamesByMd5sum, metadata) =>
-			fileNamesByMd5sum.set(metadata.fileMd5sum, [...(fileNamesByMd5sum.get(metadata.fileMd5sum) ?? []), metadata]),
-		new Map<string, SequencingMetadataType[]>(),
+	const md5sumCounts = sequencingMetadataValues.reduce(
+		(counts, metadata) => counts.set(metadata.fileMd5sum, (counts.get(metadata.fileMd5sum) ?? 0) + 1),
+		new Map<string, number>(),
 	);
 
-	return [...metadataFileNamesByMd5sum.values()].filter((files) => files.length > 1).flat();
+	return sequencingMetadataValues.filter((metadata) => (md5sumCounts.get(metadata.fileMd5sum) ?? 0) > 1);
 };
 
 const findAlreadySubmittedFiles = (
