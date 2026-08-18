@@ -315,7 +315,7 @@ export async function handleSequencingMetadataSubmission({
 		};
 	}
 
-	// Input validation - Find duplicate md5sums in senquencing metadata input
+	// Input validation - Find duplicate md5sums in sequencing metadata input
 	const duplicateMetadataFiles = findDuplicateSequencingMetadata(sequencingMetadataValues);
 
 	if (duplicateMetadataFiles.length) {
@@ -332,7 +332,7 @@ export async function handleSequencingMetadataSubmission({
 		};
 	}
 
-	// Submission valiation - Find any duplicates againt submisison file metadata
+	// Submission validation - Find any duplicates against submission file metadata
 	const existingFiles = await buildSubmissionFileMetadata(organization, submissionId);
 	const alreadySubmittedFiles = sequencingMetadataValues.filter((metadata) =>
 		existingFiles.find((existing) => existing.md5Sum === metadata.fileMd5sum),
