@@ -33,6 +33,7 @@ import { buildSubmissionFileMetadata } from '@/service/fileService.js';
 import { getAnalysisFilesByAnalysisId, submit as songSubmit } from '@/submission/song.js';
 import type { SequencingMetadataType, SubmissionManifest } from '@/submission/submitRequest.js';
 
+import type { FileMetadata } from '../controllers/submission/getSubmissionById.js';
 import { getDbInstance } from '../db/index.js';
 import { fileRepository } from '../repository/fileRepository.js';
 import { buildSequencingFilesMetadata } from './fileValidation.js';
@@ -277,6 +278,15 @@ export const findDuplicateSequencingMetadata = (
 	return [...metadataFileNamesByMd5sum.values()].filter((files) => files.length > 1).flat();
 };
 
+const findAlreadySubmittedFiles = (
+	existingFiles: FileMetadata[],
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] => {
+	const existingMd5Sums = new Set(existingFiles.flatMap(({ md5Sum }) => (md5Sum ? [md5Sum.toLowerCase()] : [])));
+
+	return sequencingMetadataValues.filter((metadata) => existingMd5Sums.has(metadata.fileMd5sum.toLowerCase()));
+};
+
 /**
  * Handles submission of sequencing metadata against an already active Submission,
  * with no new submission file. Matches the provided sequencing metadata against the
@@ -317,9 +327,7 @@ export async function handleSequencingMetadataSubmission({
 
 	// Submission validation - Find any duplicates against submission file metadata
 	const existingFiles = await buildSubmissionFileMetadata(organization, submissionId);
-	const alreadySubmittedFiles = sequencingMetadataValues.filter((metadata) =>
-		existingFiles.find((existing) => existing.md5Sum === metadata.fileMd5sum),
-	);
+	const alreadySubmittedFiles = findAlreadySubmittedFiles(existingFiles, sequencingMetadataValues);
 
 	if (alreadySubmittedFiles.length) {
 		return {
