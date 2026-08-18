@@ -27,6 +27,35 @@ const SEQUENCING_TEMPLATE = 'sequencing_payload.json' as const;
 const DATA_PREFIX = 'data.' as const;
 
 /**
+ * Returns metadata entries whose MD5 sum occurs more than once in the input.
+ * If the MD5 sum is empty, it is ignored and not considered a duplicate.
+ */
+export const findDuplicateSequencingMetadata = (
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] => {
+	const metadataWithMd5sums = sequencingMetadataValues.filter(({ fileMd5sum }) => Boolean(fileMd5sum));
+	const md5sumCounts = metadataWithMd5sums.reduce((counts, metadata) => {
+		const normalizedMd5sum = metadata.fileMd5sum.toLowerCase();
+		return counts.set(normalizedMd5sum, (counts.get(normalizedMd5sum) ?? 0) + 1);
+	}, new Map<string, number>());
+
+	return metadataWithMd5sums.filter((metadata) => (md5sumCounts.get(metadata.fileMd5sum.toLowerCase()) ?? 0) > 1);
+};
+
+/**
+ * Returns sequencing metadata whose MD5 sum is already present in submitted files.
+ * If the MD5 sum is empty, it is ignored and not considered a duplicate.
+ */
+export const findAlreadySubmittedFiles = (
+	existingFiles: { md5Sum?: string }[],
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] => {
+	const existingMd5Sums = new Set(existingFiles.flatMap(({ md5Sum }) => (md5Sum ? [md5Sum.toLowerCase()] : [])));
+
+	return sequencingMetadataValues.filter((metadata) => existingMd5Sums.has(metadata.fileMd5sum.toLowerCase()));
+};
+
+/**
  * Builds the Song payload based on the Sequencing files Metadata
  * @param param0
  * @returns

@@ -20,7 +20,70 @@
 import assert from 'node:assert/strict';
 import { suite, test } from 'node:test';
 
-import { buildSongSubmissionPayload, extractInsertRecordValues } from './sequencingPayload.js';
+import {
+	buildSongSubmissionPayload,
+	extractInsertRecordValues,
+	findAlreadySubmittedFiles,
+	findDuplicateSequencingMetadata,
+} from './sequencingPayload.js';
+
+const sequencingMetadata = (fileName: string, fileMd5sum: string) => ({
+	fileName,
+	fileSize: 100,
+	fileMd5sum,
+	fileAccess: 'open',
+	fileType: 'FASTQ',
+});
+
+suite('findDuplicateSequencingMetadata', () => {
+	test('returns every entry whose MD5 sum occurs more than once', () => {
+		const duplicateFirst = sequencingMetadata('SAMPLE001.fastq.gz', 'duplicate-md5');
+		const unique = sequencingMetadata('SAMPLE002.fastq.gz', 'unique-md5');
+		const duplicateSecond = sequencingMetadata('SAMPLE003.fastq.gz', 'duplicate-md5');
+
+		const result = findDuplicateSequencingMetadata([duplicateFirst, unique, duplicateSecond]);
+
+		assert.deepEqual(result, [duplicateFirst, duplicateSecond]);
+	});
+
+	test('returns no files when every MD5 sum is unique', () => {
+		const result = findDuplicateSequencingMetadata([
+			sequencingMetadata('SAMPLE001.fastq.gz', 'first-md5'),
+			sequencingMetadata('SAMPLE002.fastq.gz', 'second-md5'),
+		]);
+
+		assert.deepEqual(result, []);
+	});
+
+	test('ignores empty MD5 sums', () => {
+		const result = findDuplicateSequencingMetadata([
+			sequencingMetadata('SAMPLE001.fastq.gz', ''),
+			sequencingMetadata('SAMPLE002.fastq.gz', ''),
+		]);
+
+		assert.deepEqual(result, []);
+	});
+
+	test('matches duplicate MD5 sums case-insensitively', () => {
+		const uppercaseMd5 = sequencingMetadata('SAMPLE001.fastq.gz', 'ABC123');
+		const lowercaseMd5 = sequencingMetadata('SAMPLE002.fastq.gz', 'abc123');
+
+		const result = findDuplicateSequencingMetadata([uppercaseMd5, lowercaseMd5]);
+
+		assert.deepEqual(result, [uppercaseMd5, lowercaseMd5]);
+	});
+});
+
+suite('findAlreadySubmittedFiles', () => {
+	test('matches MD5 sums case-insensitively and ignores empty existing values', () => {
+		const matchingFile = sequencingMetadata('SAMPLE001.fastq.gz', 'ABC123');
+		const unmatchedFile = sequencingMetadata('SAMPLE002.fastq.gz', 'DEF456');
+
+		const result = findAlreadySubmittedFiles([{ md5Sum: 'abc123' }, { md5Sum: '' }, {}], [matchingFile, unmatchedFile]);
+
+		assert.deepEqual(result, [matchingFile]);
+	});
+});
 
 suite('extractInsertRecordValues', () => {
 	test('returns an empty array when given no records', () => {

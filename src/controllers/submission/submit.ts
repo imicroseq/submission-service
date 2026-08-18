@@ -26,11 +26,8 @@ import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { validateRequest } from '@/middleware/requestValidation.js';
 import { prevalidateNewDataFile } from '@/submission/fileValidation.js';
-import {
-	findDuplicateSequencingMetadata,
-	handleSequencingMetadataSubmission,
-	handleSubmission,
-} from '@/submission/submissionHandler.js';
+import { findDuplicateSequencingMetadata } from '@/submission/sequencingPayload.js';
+import { handleSequencingMetadataSubmission, handleSubmission } from '@/submission/submissionHandler.js';
 import {
 	type ErrorResponse,
 	type SubmissionManifest,
