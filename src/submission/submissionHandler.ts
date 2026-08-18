@@ -265,7 +265,7 @@ export async function handleSubmission({
 /**
  * Finds duplicate files in the sequencing metadata values based on their md5sum
  */
-const findDuplicateSequencingMetadata = (
+export const findDuplicateSequencingMetadata = (
 	sequencingMetadataValues: SequencingMetadataType[],
 ): SequencingMetadataType[] => {
 	const metadataFileNamesByMd5sum = sequencingMetadataValues.reduce(
@@ -308,23 +308,6 @@ export async function handleSequencingMetadataSubmission({
 			errors: [
 				{
 					message: 'Sequencing file submission is not enabled for this category.',
-					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
-					batchName,
-				},
-			],
-		};
-	}
-
-	// Input validation - Find duplicate md5sums in sequencing metadata input
-	const duplicateMetadataFiles = findDuplicateSequencingMetadata(sequencingMetadataValues);
-
-	if (duplicateMetadataFiles.length) {
-		return {
-			success: false,
-			submissionId,
-			errors: [
-				{
-					message: `The following files have duplicate md5sum values: ${duplicateMetadataFiles.map((metadata) => metadata.fileName).join(', ')}`,
 					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
 					batchName,
 				},

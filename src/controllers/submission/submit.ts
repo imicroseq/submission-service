@@ -19,14 +19,18 @@
 
 import { type Response } from 'express';
 
-import { ACTIVE_SUBMISSION_STATUS, type BatchError } from '@overture-stack/lyric';
+import { ACTIVE_SUBMISSION_STATUS, BATCH_ERROR_TYPE, type BatchError } from '@overture-stack/lyric';
 
 import { hasUserWriteAccess, shouldBypassAuth } from '@/common/auth.js';
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { validateRequest } from '@/middleware/requestValidation.js';
 import { prevalidateNewDataFile } from '@/submission/fileValidation.js';
-import { handleSequencingMetadataSubmission, handleSubmission } from '@/submission/submissionHandler.js';
+import {
+	findDuplicateSequencingMetadata,
+	handleSequencingMetadataSubmission,
+	handleSubmission,
+} from '@/submission/submissionHandler.js';
 import {
 	type ErrorResponse,
 	type SubmissionManifest,
@@ -58,6 +62,21 @@ export const submit = validateRequest(
 					error: 'Forbidden',
 					message: `User is not authorized to submit data to '${organization}'`,
 				});
+			}
+
+			// Input validation - Find duplicate md5sums in sequencing metadata input
+			if (sequencingMetadataValues && sequencingMetadataValues.length > 0) {
+				const duplicateMetadataFiles = findDuplicateSequencingMetadata(sequencingMetadataValues);
+
+				if (duplicateMetadataFiles.length) {
+					return respondWithInvalidSubmission(res, undefined, [
+						{
+							message: `The following files have duplicate md5sum values: ${duplicateMetadataFiles.map((metadata) => metadata.fileName).join(', ')}`,
+							type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+							batchName: submissionFile?.originalname || '',
+						},
+					]);
+				}
 			}
 
 			if (!submissionFile) {
