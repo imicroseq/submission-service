@@ -17,6 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import type { SelectSubmissionFile } from '@/db/schemas/record_analysis_map.js';
 import type { SequencingMetadataType } from '@/submission/submitRequest.js';
 
 import { buildFileMetadata } from './fileValidation.js';
@@ -47,10 +48,10 @@ export const findDuplicateSequencingMetadata = (
  * If the MD5 sum is empty, it is ignored and not considered a duplicate.
  */
 export const findAlreadySubmittedFiles = (
-	existingFiles: { md5Sum?: string }[],
+	existingFiles: SelectSubmissionFile[],
 	sequencingMetadataValues: SequencingMetadataType[],
 ): SequencingMetadataType[] => {
-	const existingMd5Sums = new Set(existingFiles.flatMap(({ md5Sum }) => (md5Sum ? [md5Sum.toLowerCase()] : [])));
+	const existingMd5Sums = new Set(existingFiles.flatMap(({ md5_sum }) => (md5_sum ? [md5_sum.toLowerCase()] : [])));
 
 	return sequencingMetadataValues.filter((metadata) => existingMd5Sums.has(metadata.fileMd5sum.toLowerCase()));
 };

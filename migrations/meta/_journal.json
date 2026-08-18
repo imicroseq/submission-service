@@ -22,6 +22,13 @@
       "when": 1752690000762,
       "tag": "0002_add_system_id_colum_map_table",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787078241227,
+      "tag": "0003_add_md5_sum_column_map_table",
+      "breakpoints": true
     }
   ]
 }

@@ -28,6 +28,7 @@ export const submissionFiles = schema.table(
 		submission_id: integer().notNull(),
 		record_identifier: varchar({ length: 255 }).notNull(),
 		analysis_id: varchar({ length: 255 }).notNull(),
+		md5_sum: varchar({ length: 255 }),
 		system_id: varchar({ length: 255 }),
 		created_at: timestamp().notNull().defaultNow(),
 	},

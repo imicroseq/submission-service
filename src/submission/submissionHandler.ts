@@ -29,7 +29,7 @@ import { env } from '@/common/envConfig.js';
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { type InsertSubmissionFile } from '@/db/schemas/index.js';
-import { buildSubmissionFileMetadata } from '@/service/fileService.js';
+import { buildSubmissionFileMetadata, fetchSubmissionFilesBySubmissionId } from '@/service/fileService.js';
 import { getAnalysisFilesByAnalysisId, submit as songSubmit } from '@/submission/song.js';
 import type { SequencingMetadataType, SubmissionManifest } from '@/submission/submitRequest.js';
 
@@ -108,6 +108,7 @@ const submitSongPayload = async (
 				analysis_id: result.analysisId,
 				submission_id: submissionId,
 				record_identifier: record[fileNameIdentifier],
+				md5_sum: record.data?.fileMd5sum || '',
 			});
 		} catch (error) {
 			songErrors.push({
@@ -305,8 +306,8 @@ export async function handleSequencingMetadataSubmission({
 	}
 
 	// Submission validation - Find any duplicates against submission file metadata
-	const existingFiles = await buildSubmissionFileMetadata(organization, submissionId);
-	const alreadySubmittedFiles = findAlreadySubmittedFiles(existingFiles, sequencingMetadataValues);
+	const existingSubmissionFiles = await fetchSubmissionFilesBySubmissionId(submissionId);
+	const alreadySubmittedFiles = findAlreadySubmittedFiles(existingSubmissionFiles, sequencingMetadataValues);
 
 	if (alreadySubmittedFiles.length) {
 		return {
@@ -376,6 +377,7 @@ export async function handleSequencingMetadataSubmission({
 	}
 
 	// Combine the Submission's existing files with the newly submitted sequencing files
+	const existingFiles = await buildSubmissionFileMetadata(organization, submissionId);
 	const newFiles = await buildSubmissionManifest(songSubmissionResult.analysisIds, organization);
 
 	const submissionManifest: SubmissionManifest[] = [

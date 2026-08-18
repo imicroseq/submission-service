@@ -1,0 +1,1 @@
+ALTER TABLE "submission"."record_analysis_map" ADD COLUMN "md5_sum" varchar(255);
