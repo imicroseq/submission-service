@@ -27,6 +27,10 @@ import { convertRecordToPayload, prefixKeys } from './populateTemplate.js';
 const SEQUENCING_TEMPLATE = 'sequencing_payload.json' as const;
 const DATA_PREFIX = 'data.' as const;
 
+export type SongSubmissionPayload = Record<string, any> & {
+	files: SequencingMetadataType[];
+};
+
 /**
  * Returns metadata entries whose MD5 sum occurs more than once in the input.
  * If the MD5 sum is empty, it is ignored and not considered a duplicate.
@@ -71,8 +75,8 @@ export const buildSongSubmissionPayload = ({
 	extractedData: Record<string, string>[];
 	organization: string;
 	fileNameIdentifier: string;
-}): Record<string, any>[] => {
-	const songSubmissionData: Record<string, any>[] = [];
+}): SongSubmissionPayload[] => {
+	const songSubmissionData: SongSubmissionPayload[] = [];
 	// Convert Sequencing metadata to payload
 	for (const filesMetadata of sequencingFilesMetadata) {
 		const matchedRecord = extractedData.find((record) => record[fileNameIdentifier] === filesMetadata.identifier);
@@ -82,9 +86,11 @@ export const buildSongSubmissionPayload = ({
 		}
 
 		const prefixedRecord = prefixKeys(matchedRecord, DATA_PREFIX);
-		const songPayload = convertRecordToPayload({ organization, ...prefixedRecord }, SEQUENCING_TEMPLATE);
 		// TODO: Handle multiple files by same identifier
-		songPayload.files = [buildFileMetadata(filesMetadata)];
+		const songPayload: SongSubmissionPayload = {
+			...convertRecordToPayload({ organization, ...prefixedRecord }, SEQUENCING_TEMPLATE),
+			files: [buildFileMetadata(filesMetadata)], // Only 1s sequencing file per record is expected, but we can extend this in the future if needed
+		};
 
 		songSubmissionData.push(songPayload);
 	}

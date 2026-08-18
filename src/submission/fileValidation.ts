@@ -215,7 +215,7 @@ export const buildSequencingFilesMetadata = (
 /**
  * Converters the Sequencing metadata to a payload format.
  */
-export const buildFileMetadata = (file: SequencingMetadataType & { identifier: string }) => {
+export const buildFileMetadata = (file: SequencingMetadataType & { identifier: string }): SequencingMetadataType => {
 	return {
 		fileName: file.fileName,
 		fileSize: file.fileSize,

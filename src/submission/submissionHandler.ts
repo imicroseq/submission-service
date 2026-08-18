@@ -41,6 +41,7 @@ import {
 	buildSongSubmissionPayload,
 	extractInsertRecordValues,
 	findAlreadySubmittedFiles,
+	type SongSubmissionPayload,
 } from './sequencingPayload.js';
 
 interface SuccessSubmissionResult {
@@ -86,7 +87,7 @@ const buildSubmissionManifest = async (analysisIds: string[], organization: stri
  * @returns
  */
 const submitSongPayload = async (
-	songSubmissionData: Record<string, any>[],
+	songSubmissionData: SongSubmissionPayload[],
 	organization: string,
 	submissionId: number,
 	fileNameIdentifier: string,
@@ -108,7 +109,7 @@ const submitSongPayload = async (
 				analysis_id: result.analysisId,
 				submission_id: submissionId,
 				record_identifier: record[fileNameIdentifier],
-				md5_sum: record.data?.fileMd5sum || '',
+				md5_sum: record.files[0]?.fileMd5sum || '',
 			});
 		} catch (error) {
 			songErrors.push({
@@ -182,7 +183,7 @@ export async function handleSubmission({
 
 	const extractedData = await parseFileToRecords(submissionFile, schema);
 
-	const songSubmissionData: Record<string, any>[] = [];
+	const songSubmissionData: SongSubmissionPayload[] = [];
 
 	// Build Sequencing metadata
 	if (sequencingMetadataValues) {
