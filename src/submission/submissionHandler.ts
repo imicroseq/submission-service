@@ -28,13 +28,13 @@ import {
 import { env } from '@/common/envConfig.js';
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
+import { getDbInstance } from '@/db/index.js';
 import { type InsertSubmissionFile } from '@/db/schemas/index.js';
+import { fileRepository } from '@/repository/fileRepository.js';
 import { buildSubmissionFileMetadata, fetchSubmissionFilesBySubmissionId } from '@/service/fileService.js';
 import { getAnalysisFilesByAnalysisId, submit as songSubmit } from '@/submission/song.js';
 import type { SequencingMetadataType, SubmissionManifest } from '@/submission/submitRequest.js';
 
-import { getDbInstance } from '../db/index.js';
-import { fileRepository } from '../repository/fileRepository.js';
 import { buildSequencingFilesMetadata } from './fileValidation.js';
 import { parseFileToRecords } from './readFile.js';
 import {
@@ -55,6 +55,21 @@ interface ErrorSubmissionResult {
 	submissionId?: number;
 	errors: BatchError[];
 }
+
+const createSubmissionError = (message: string, submissionId: number, batchName: string): ErrorSubmissionResult => {
+	logger.info(message);
+	return {
+		success: false,
+		submissionId,
+		errors: [
+			{
+				message,
+				type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+				batchName,
+			},
+		],
+	};
+};
 
 /**
  * Constructs an array of data to be used for the file Manifest
@@ -293,17 +308,11 @@ export async function handleSequencingMetadataSubmission({
 	const batchName = `Submission ${submissionId}`;
 
 	if (!fileNameIdentifier || !sequencingEnabled) {
-		return {
-			success: false,
+		return createSubmissionError(
+			'Sequencing file submission is not enabled for this category.',
 			submissionId,
-			errors: [
-				{
-					message: 'Sequencing file submission is not enabled for this category.',
-					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
-					batchName,
-				},
-			],
-		};
+			batchName,
+		);
 	}
 
 	// Submission validation - Find any duplicates against submission file metadata
@@ -311,17 +320,8 @@ export async function handleSequencingMetadataSubmission({
 	const alreadySubmittedFiles = findAlreadySubmittedFiles(existingSubmissionFiles, sequencingMetadataValues);
 
 	if (alreadySubmittedFiles.length) {
-		return {
-			success: false,
-			submissionId,
-			errors: [
-				{
-					message: `The following files have already been submitted for this submission: ${alreadySubmittedFiles.map((file) => file.fileName).join(', ')}`,
-					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
-					batchName,
-				},
-			],
-		};
+		const errorMessage = `The following files have already been submitted for this submission: ${alreadySubmittedFiles.map((file) => file.fileName).join(', ')}`;
+		return createSubmissionError(errorMessage, submissionId, batchName);
 	}
 
 	// Grab the clinical records already staged on the active Submission to match against the sequencing metadata
@@ -352,17 +352,11 @@ export async function handleSequencingMetadataSubmission({
 	});
 
 	if (!songSubmissionData.length) {
-		return {
-			success: false,
+		return createSubmissionError(
+			'No sequencing files matched the records of the current active Submission.',
 			submissionId,
-			errors: [
-				{
-					message: 'No sequencing files matched the records of the current active Submission.',
-					type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
-					batchName,
-				},
-			],
-		};
+			batchName,
+		);
 	}
 
 	const songSubmissionResult = await submitSongPayload(
