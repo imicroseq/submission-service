@@ -20,14 +20,16 @@
 import assert from 'node:assert/strict';
 import { suite, test } from 'node:test';
 
+import type { SelectSubmissionFile } from '../db/schemas/record_analysis_map.js';
 import {
 	buildSongSubmissionPayload,
 	extractInsertRecordValues,
 	findAlreadySubmittedFiles,
 	findDuplicateSequencingMetadata,
 } from './sequencingPayload.js';
+import type { SequencingMetadataType } from './submitRequest.js';
 
-const sequencingMetadata = (fileName: string, fileMd5sum: string) => ({
+const sequencingMetadata = (fileName: string, fileMd5sum: string): SequencingMetadataType => ({
 	fileName,
 	fileSize: 100,
 	fileMd5sum,
@@ -37,16 +39,18 @@ const sequencingMetadata = (fileName: string, fileMd5sum: string) => ({
 
 const mappingSequencingMetadata = (
 	submissionId: number,
+	systemId: string,
 	recordIdentifier: string,
 	analysisId: string,
 	md5Sum: string,
-) => ({
+): SelectSubmissionFile => ({
 	id: 1,
+	system_id: systemId,
 	submission_id: submissionId,
 	record_identifier: recordIdentifier,
 	analysis_id: analysisId,
 	md5_sum: md5Sum,
-	created_at: Date.now().toString(),
+	created_at: new Date(),
 });
 
 suite('findDuplicateSequencingMetadata', () => {
@@ -90,29 +94,29 @@ suite('findDuplicateSequencingMetadata', () => {
 
 suite('findAlreadySubmittedFiles', () => {
 	test('matches MD5 sums case-insensitively', () => {
-		const exsistingFiles = [
-			mappingSequencingMetadata(1, 'SAMPLE001', 'ANALYSIS001', 'abc123'),
-			mappingSequencingMetadata(1, 'SAMPLE002', 'ANALYSIS002', 'xz789'),
+		const esistingFiles = [
+			mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123'),
+			mappingSequencingMetadata(1, 'system-2', 'SAMPLE002', 'ANALYSIS002', 'xz789'),
 		];
 
 		const matchingFile = sequencingMetadata('SAMPLE001.fastq.gz', 'ABC123');
 		const unmatchedFile = sequencingMetadata('SAMPLE002.fastq.gz', 'DEF456');
 
-		const result = findAlreadySubmittedFiles(exsistingFiles, [matchingFile, unmatchedFile]);
+		const result = findAlreadySubmittedFiles(esistingFiles, [matchingFile, unmatchedFile]);
 
 		assert.deepEqual(result, [matchingFile]);
 	});
 
 	test('ignores empty MD5 sums in existing files', () => {
-		const exsistingFiles = [
-			mappingSequencingMetadata(1, 'SAMPLE001', 'ANALYSIS001', ''),
-			mappingSequencingMetadata(1, 'SAMPLE002', 'ANALYSIS002', ''),
+		const esistingFiles = [
+			mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', ''),
+			mappingSequencingMetadata(1, 'system-2', 'SAMPLE002', 'ANALYSIS002', ''),
 		];
 
 		const unmatchedFile1 = sequencingMetadata('SAMPLE001.fastq.gz', 'ABC123');
 		const unmatchedFile2 = sequencingMetadata('SAMPLE002.fastq.gz', 'DEF456');
 
-		const result = findAlreadySubmittedFiles(exsistingFiles, [unmatchedFile1, unmatchedFile2]);
+		const result = findAlreadySubmittedFiles(esistingFiles, [unmatchedFile1, unmatchedFile2]);
 
 		assert.deepEqual(result, []);
 	});
