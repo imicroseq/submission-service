@@ -31,7 +31,7 @@ import { lyricProvider } from '@/core/provider.js';
 import { getDbInstance } from '@/db/index.js';
 import { type InsertSubmissionFile } from '@/db/schemas/index.js';
 import { fileRepository } from '@/repository/fileRepository.js';
-import { buildSubmissionFileMetadata, fetchSubmissionFilesBySubmissionId } from '@/service/fileService.js';
+import { buildSubmissionFileMetadata } from '@/service/fileService.js';
 import { getAnalysisFilesByAnalysisId, submit as songSubmit } from '@/submission/song.js';
 import type { SequencingMetadataType, SubmissionManifest } from '@/submission/submitRequest.js';
 
@@ -40,7 +40,6 @@ import { parseFileToRecords } from './readFile.js';
 import {
 	buildSongSubmissionPayload,
 	extractInsertRecordValues,
-	findAlreadySubmittedFiles,
 	type SongSubmissionPayload,
 } from './sequencingPayload.js';
 
@@ -149,7 +148,7 @@ const submitSongPayload = async (
 	}
 
 	try {
-		fileRepo.saveSubmissionFiles(insertSubmissionFiles);
+		await fileRepo.saveSubmissionFiles(insertSubmissionFiles);
 	} catch (error) {
 		logger.error(error, 'An error ocurring storing submission files mapping.');
 		// Lyric submission + Song Submission was successful, but storing submission files mapping failed
@@ -313,15 +312,6 @@ export async function handleSequencingMetadataSubmission({
 			submissionId,
 			batchName,
 		);
-	}
-
-	// Submission validation - Find any duplicates against submission file metadata
-	const existingSubmissionFiles = await fetchSubmissionFilesBySubmissionId(submissionId);
-	const alreadySubmittedFiles = findAlreadySubmittedFiles(existingSubmissionFiles, sequencingMetadataValues);
-
-	if (alreadySubmittedFiles.length) {
-		const errorMessage = `The following files have already been submitted for this submission: ${alreadySubmittedFiles.map((file) => file.fileName).join(', ')}`;
-		return createSubmissionError(errorMessage, submissionId, batchName);
 	}
 
 	// Grab the clinical records already staged on the active Submission to match against the sequencing metadata

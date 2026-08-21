@@ -17,6 +17,8 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import { BATCH_ERROR_TYPE, type BatchError } from '@overture-stack/lyric';
+
 import type { SelectSubmissionFile } from '@/db/schemas/record_analysis_map.js';
 import type { SequencingMetadataType } from '@/submission/submitRequest.js';
 
@@ -58,6 +60,52 @@ export const findAlreadySubmittedFiles = (
 	const existingMd5Sums = new Set(existingFiles.flatMap(({ md5_sum }) => (md5_sum ? [md5_sum.toLowerCase()] : [])));
 
 	return sequencingMetadataValues.filter((metadata) => existingMd5Sums.has(metadata.fileMd5sum.toLowerCase()));
+};
+
+/**
+ * Returns a BatchError if there are duplicate sequencing metadata entries, otherwise returns undefined.
+ * @param sequencingMetadataValues - The sequencing metadata values to check for duplicates
+ * @param batchName - The name of the batch, used in the error message if duplicates are found
+ * @returns A BatchError if duplicates are found, otherwise undefined
+ */
+export const getDuplicateSequencingMetadataError = (
+	sequencingMetadataValues: SequencingMetadataType[],
+	batchName?: string,
+): BatchError | undefined => {
+	const duplicateMetadataFiles = findDuplicateSequencingMetadata(sequencingMetadataValues);
+	if (!duplicateMetadataFiles.length) {
+		return undefined;
+	}
+
+	return {
+		message: `The following files have duplicate md5sum values: ${duplicateMetadataFiles.map((metadata) => metadata.fileName).join(', ')}`,
+		type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+		batchName: batchName || '',
+	};
+};
+
+/**
+ * Returns a BatchError if there are already submitted files, otherwise returns undefined.
+ * @param existingFiles - The existing submitted files to check against
+ * @param sequencingMetadataValues - The sequencing metadata values to check for already submitted files
+ * @param batchName - The name of the batch, used in the error message if already submitted files are found
+ * @returns A BatchError if already submitted files are found, otherwise undefined
+ */
+export const getAlreadySubmittedFilesError = (
+	existingFiles: SelectSubmissionFile[],
+	sequencingMetadataValues: SequencingMetadataType[],
+	batchName?: string,
+): BatchError | undefined => {
+	const alreadySubmittedFiles = findAlreadySubmittedFiles(existingFiles, sequencingMetadataValues);
+	if (!alreadySubmittedFiles.length) {
+		return undefined;
+	}
+
+	return {
+		message: `The following files have already been submitted for this submission: ${alreadySubmittedFiles.map((file) => file.fileName).join(', ')}`,
+		type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+		batchName: batchName || '',
+	};
 };
 
 /**

@@ -26,6 +26,8 @@ import {
 	extractInsertRecordValues,
 	findAlreadySubmittedFiles,
 	findDuplicateSequencingMetadata,
+	getAlreadySubmittedFilesError,
+	getDuplicateSequencingMetadataError,
 } from './sequencingPayload.js';
 import type { SequencingMetadataType } from './submitRequest.js';
 
@@ -119,6 +121,54 @@ suite('findAlreadySubmittedFiles', () => {
 		const result = findAlreadySubmittedFiles(esistingFiles, [unmatchedFile1, unmatchedFile2]);
 
 		assert.deepEqual(result, []);
+	});
+});
+
+suite('getDuplicateSequencingMetadataError', () => {
+	test('returns a batch error for duplicate md5 sums in the input metadata', () => {
+		const duplicateFirst = sequencingMetadata('SAMPLE001.fastq.gz', 'duplicate-md5');
+		const duplicateSecond = sequencingMetadata('SAMPLE003.fastq.gz', 'duplicate-md5');
+
+		const result = getDuplicateSequencingMetadataError([duplicateFirst, duplicateSecond], 'main-file.fastq.gz');
+
+		assert.deepEqual(result, {
+			message: 'The following files have duplicate md5sum values: SAMPLE001.fastq.gz, SAMPLE003.fastq.gz',
+			type: 'INCORRECT_SECTION',
+			batchName: 'main-file.fastq.gz',
+		});
+	});
+
+	test('returns undefined when the provided metadata has no duplicate md5 sums', () => {
+		const result = getDuplicateSequencingMetadataError(
+			[sequencingMetadata('SAMPLE001.fastq.gz', 'first-md5'), sequencingMetadata('SAMPLE002.fastq.gz', 'second-md5')],
+			'main-file.fastq.gz',
+		);
+
+		assert.equal(result, undefined);
+	});
+});
+
+suite('getAlreadySubmittedFilesError', () => {
+	test('returns a batch error when metadata files were already submitted for the active submission', () => {
+		const existingFiles = [mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123')];
+		const submittedMetadata = [sequencingMetadata('SAMPLE001.fastq.gz', 'ABC123')];
+
+		const result = getAlreadySubmittedFilesError(existingFiles, submittedMetadata, 'main-file.fastq.gz');
+
+		assert.deepEqual(result, {
+			message: 'The following files have already been submitted for this submission: SAMPLE001.fastq.gz',
+			type: 'INCORRECT_SECTION',
+			batchName: 'main-file.fastq.gz',
+		});
+	});
+
+	test('returns undefined when none of the sequencing metadata matches existing submission files', () => {
+		const existingFiles = [mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123')];
+		const metadata = [sequencingMetadata('SAMPLE002.fastq.gz', 'DEF456')];
+
+		const result = getAlreadySubmittedFilesError(existingFiles, metadata, 'main-file.fastq.gz');
+
+		assert.equal(result, undefined);
 	});
 });
 

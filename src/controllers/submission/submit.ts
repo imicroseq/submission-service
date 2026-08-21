@@ -19,14 +19,15 @@
 
 import { type Response } from 'express';
 
-import { ACTIVE_SUBMISSION_STATUS, BATCH_ERROR_TYPE, type BatchError } from '@overture-stack/lyric';
+import { ACTIVE_SUBMISSION_STATUS, type BatchError, type SubmissionSummary } from '@overture-stack/lyric';
 
 import { hasUserWriteAccess, shouldBypassAuth } from '@/common/auth.js';
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { validateRequest } from '@/middleware/requestValidation.js';
+import { fetchSubmissionFilesBySubmissionId } from '@/service/fileService.js';
 import { prevalidateNewDataFile } from '@/submission/fileValidation.js';
-import { findDuplicateSequencingMetadata } from '@/submission/sequencingPayload.js';
+import { getAlreadySubmittedFilesError, getDuplicateSequencingMetadataError } from '@/submission/sequencingPayload.js';
 import { handleSequencingMetadataSubmission, handleSubmission } from '@/submission/submissionHandler.js';
 import {
 	type ErrorResponse,
@@ -61,18 +62,40 @@ export const submit = validateRequest(
 				});
 			}
 
-			// Input validation - Find duplicate md5sums in sequencing metadata input
-			if (sequencingMetadataValues && sequencingMetadataValues.length > 0) {
-				const duplicateMetadataFiles = findDuplicateSequencingMetadata(sequencingMetadataValues);
+			if (!submissionFile && (!sequencingMetadataValues || sequencingMetadataValues.length === 0)) {
+				throw new lyricProvider.utils.errors.BadRequest(
+					'Missing submission file and sequencing metadata. Please provide at least one of these for processing.',
+				);
+			}
 
-				if (duplicateMetadataFiles.length) {
-					return respondWithInvalidSubmission(res, undefined, [
-						{
-							message: `The following files have duplicate md5sum values: ${duplicateMetadataFiles.map((metadata) => metadata.fileName).join(', ')}`,
-							type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
-							batchName: submissionFile?.originalname || '',
-						},
-					]);
+			let activeSubmission: SubmissionSummary | undefined;
+
+			if (sequencingMetadataValues?.length) {
+				const duplicateMetadataError = getDuplicateSequencingMetadataError(
+					sequencingMetadataValues,
+					submissionFile?.originalname,
+				);
+				if (duplicateMetadataError) {
+					return respondWithInvalidSubmission(res, undefined, [duplicateMetadataError]);
+				}
+
+				activeSubmission = await lyricProvider.services.submission.getActiveSubmissionByOrganization({
+					categoryId,
+					username: user?.username || '',
+					organization,
+				});
+
+				if (activeSubmission) {
+					const existingSubmissionFiles = await fetchSubmissionFilesBySubmissionId(activeSubmission.id);
+					const alreadySubmittedError = getAlreadySubmittedFilesError(
+						existingSubmissionFiles,
+						sequencingMetadataValues,
+						submissionFile?.originalname,
+					);
+
+					if (alreadySubmittedError) {
+						return respondWithInvalidSubmission(res, activeSubmission.id, [alreadySubmittedError]);
+					}
 				}
 			}
 
@@ -82,11 +105,6 @@ export const submit = validateRequest(
 						'The "submissionFile" parameter is missing or empty. Please include a file in the request for processing.',
 					);
 				}
-				const activeSubmission = await lyricProvider.services.submission.getActiveSubmissionByOrganization({
-					categoryId,
-					username: user?.username || '',
-					organization,
-				});
 
 				if (!activeSubmission) {
 					throw new lyricProvider.utils.errors.BadRequest(
