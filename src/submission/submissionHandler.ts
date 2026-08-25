@@ -123,7 +123,7 @@ const submitSongPayload = async (
 				analysis_id: result.analysisId,
 				submission_id: submissionId,
 				record_identifier: record[fileNameIdentifier],
-				md5_sum: record.files[0]?.fileMd5sum || '',
+				md5_sum: record.files[0]?.fileMd5sum,
 			});
 		} catch (error) {
 			songErrors.push({

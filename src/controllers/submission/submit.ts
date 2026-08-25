@@ -22,12 +22,16 @@ import { type Response } from 'express';
 import { ACTIVE_SUBMISSION_STATUS, type BatchError, type SubmissionSummary } from '@overture-stack/lyric';
 
 import { hasUserWriteAccess, shouldBypassAuth } from '@/common/auth.js';
+import { env } from '@/common/envConfig.js';
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { validateRequest } from '@/middleware/requestValidation.js';
-import { fetchSubmissionFilesBySubmissionId } from '@/service/fileService.js';
+import { fetchSubmissionFilesByMd5sum, fetchSubmissionFilesBySubmissionId } from '@/service/fileService.js';
 import { prevalidateNewDataFile } from '@/submission/fileValidation.js';
-import { getAlreadySubmittedFilesError, getDuplicateSequencingMetadataError } from '@/submission/sequencingPayload.js';
+import {
+	getDuplicateFileMd5sumError,
+	getDuplicateRecordIdentifierInSubmissionError,
+} from '@/submission/sequencingPayload.js';
 import { handleSequencingMetadataSubmission, handleSubmission } from '@/submission/submissionHandler.js';
 import {
 	type ErrorResponse,
@@ -71,30 +75,41 @@ export const submit = validateRequest(
 			let activeSubmission: SubmissionSummary | undefined;
 
 			if (sequencingMetadataValues?.length) {
-				const duplicateMetadataError = getDuplicateSequencingMetadataError(
-					sequencingMetadataValues,
-					submissionFile?.originalname,
-				);
-				if (duplicateMetadataError) {
-					return respondWithInvalidSubmission(res, undefined, [duplicateMetadataError]);
-				}
-
 				activeSubmission = await lyricProvider.services.submission.getActiveSubmissionByOrganization({
 					categoryId,
 					username: user?.username || '',
 					organization,
 				});
 
-				if (activeSubmission) {
-					const existingSubmissionFiles = await fetchSubmissionFilesBySubmissionId(activeSubmission.id);
-					const alreadySubmittedError = getAlreadySubmittedFilesError(
+				const existingSubmissionFiles = activeSubmission
+					? await fetchSubmissionFilesBySubmissionId(activeSubmission.id)
+					: [];
+
+				const duplicateRecordIdentifierErrors = getDuplicateRecordIdentifierInSubmissionError(
+					existingSubmissionFiles,
+					sequencingMetadataValues,
+					submissionFile?.originalname,
+				);
+
+				if (duplicateRecordIdentifierErrors.length) {
+					return respondWithInvalidSubmission(res, activeSubmission?.id, duplicateRecordIdentifierErrors);
+				}
+
+				// Find MD5 duplicates in the database if duplicates are not allowed
+				if (!env.SEQUENCING_SUBMISSION_ALLOW_DUPLICATES) {
+					const sequencingMetadataMd5sums = sequencingMetadataValues
+						.map<string>((file) => file.fileMd5sum ?? '')
+						.filter(Boolean);
+
+					const existingSubmissionFiles = await fetchSubmissionFilesByMd5sum(sequencingMetadataMd5sums, true);
+					const duplicateFileMd5sumError = getDuplicateFileMd5sumError(
 						existingSubmissionFiles,
 						sequencingMetadataValues,
 						submissionFile?.originalname,
 					);
 
-					if (alreadySubmittedError) {
-						return respondWithInvalidSubmission(res, activeSubmission.id, [alreadySubmittedError]);
+					if (duplicateFileMd5sumError.length) {
+						return respondWithInvalidSubmission(res, activeSubmission?.id, duplicateFileMd5sumError);
 					}
 				}
 			}
@@ -199,6 +214,7 @@ const respondWithInvalidSubmission = (
 	submissionId: number | undefined,
 	errors: BatchError[],
 ): Response<SubmitResponse> => {
+	logger.info(`Invalid submission ${submissionId}: ${JSON.stringify(errors.map((error) => error.message))}`);
 	return res.status(200).send({
 		submissionId,
 		status: ACTIVE_SUBMISSION_STATUS.INVALID_SUBMISSION,

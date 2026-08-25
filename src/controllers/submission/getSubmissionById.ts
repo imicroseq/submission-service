@@ -44,7 +44,7 @@ export const getSubmissionByIdRequestSchema: RequestValidation<object, ParsedQs,
 export type FileMetadata = {
 	objectId: string;
 	fileName: string;
-	md5Sum: string;
+	md5Sum?: string;
 	isUploaded: boolean;
 };
 

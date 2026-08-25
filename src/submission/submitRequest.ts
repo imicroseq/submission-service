@@ -29,10 +29,15 @@ import type { RequestValidation } from '@/middleware/requestValidation.js';
 interface SubmitRequestPathParams extends ParamsDictionary {
 	categoryId: string;
 }
+
+const md5SumValidation = z.string().regex(/^[a-fA-F0-9]{32}$/, {
+	message: 'Invalid MD5 sum format. Must be a 32-character hexadecimal string.',
+});
+
 export const fileMetadataSchema = z.object({
 	fileName: z.string(),
 	fileSize: z.coerce.number(),
-	fileMd5sum: z.string(),
+	fileMd5sum: md5SumValidation.optional(),
 	fileAccess: z.string(),
 	fileType: z.string(),
 });
@@ -101,7 +106,7 @@ export type ErrorResponse = {
 export type SubmissionManifest = {
 	objectId: string;
 	fileName: string;
-	md5Sum: string;
+	md5Sum?: string;
 };
 
 export type SubmitResponse = {
