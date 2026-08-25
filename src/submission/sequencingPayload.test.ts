@@ -95,6 +95,13 @@ suite('findDuplicateInputRecordIdentifier', () => {
 		assert.deepEqual(result, [firstFile, secondFile]);
 	});
 
+	test('matches duplicate identifiers case-insensitively', () => {
+		const firstFile = sequencingMetadata('sample001.fastq.gz', 'first-md5');
+		const secondFile = sequencingMetadata('SAMPLE001.vcf.gz', 'second-md5');
+
+		assert.deepEqual(findDuplicateInputRecordIdentifier([firstFile, secondFile]), [firstFile, secondFile]);
+	});
+
 	test('preserves the input order when multiple identifiers are duplicated', () => {
 		const first = sequencingMetadata('SAMPLE001.fastq.gz', 'first-md5');
 		const second = sequencingMetadata('SAMPLE002.fastq.gz', 'second-md5');
@@ -127,6 +134,13 @@ suite('findDuplicateInputMd5sum', () => {
 		];
 
 		assert.deepEqual(findDuplicateInputMd5sum(metadata), []);
+	});
+
+	test('matches duplicate MD5 sums case-insensitively', () => {
+		const first = sequencingMetadata('SAMPLE001.fastq.gz', 'AbC123');
+		const second = sequencingMetadata('SAMPLE002.fastq.gz', 'aBc123');
+
+		assert.deepEqual(findDuplicateInputMd5sum([first, second]), [first, second]);
 	});
 });
 
@@ -186,6 +200,20 @@ suite('findSubmittedDuplicateMd5sums', () => {
 		]);
 	});
 
+	test('returns files whose MD5 sums matches case insensitively', () => {
+		const existingFiles = [
+			mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123'),
+			mappingSequencingMetadata(1, 'system-2', 'SAMPLE002', 'ANALYSIS002', ''),
+		];
+		const matchingFile = sequencingMetadata('SAMPLE003.fastq.gz', 'aBc123');
+		const emptyMd5File = sequencingMetadata('SAMPLE004.fastq.gz', '');
+		const unmatchedFile = sequencingMetadata('SAMPLE005.fastq.gz', 'def456');
+
+		assert.deepEqual(findSubmittedDuplicateMd5sums(existingFiles, [matchingFile, emptyMd5File, unmatchedFile]), [
+			matchingFile,
+		]);
+	});
+
 	test('returns no files when there are no existing files or matching MD5 sums', () => {
 		assert.deepEqual(findSubmittedDuplicateMd5sums([], [sequencingMetadata('SAMPLE001.fastq.gz', 'abc123')]), []);
 	});
@@ -211,7 +239,7 @@ suite('getDuplicateRecordIdentifierInSubmissionError', () => {
 		]);
 	});
 
-	test('returns undefined when none of the sequencing metadata matches existing submission files', () => {
+	test('returns no errors when none of the sequencing metadata matches existing submission files', () => {
 		const existingFiles = [mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123')];
 		const metadata = [sequencingMetadata('SAMPLE002.fastq.gz', 'DEF456')];
 

@@ -42,7 +42,7 @@ export const findDuplicateInputRecordIdentifier = (
 ): SequencingMetadataType[] => {
 	const metadataWithIdentifiers = sequencingMetadataValues.map((metadata) => ({
 		metadata,
-		identifier: getIdentifierFromFileName(metadata.fileName),
+		identifier: getIdentifierFromFileName(metadata.fileName).toLowerCase(),
 	}));
 	const identifierCounts = metadataWithIdentifiers.reduce((counts, { identifier }) => {
 		return counts.set(identifier, (counts.get(identifier) ?? 0) + 1);
@@ -63,13 +63,14 @@ export const findDuplicateInputMd5sum = (
 		.filter((metadata) => metadata.fileMd5sum)
 		.reduce((counts, metadata) => {
 			if (metadata.fileMd5sum) {
-				return counts.set(metadata.fileMd5sum, (counts.get(metadata.fileMd5sum) ?? 0) + 1);
+				const normalizedMd5sum = metadata.fileMd5sum.toLowerCase();
+				return counts.set(normalizedMd5sum, (counts.get(normalizedMd5sum) ?? 0) + 1);
 			}
 			return counts;
 		}, new Map<string, number>());
 
 	return sequencingMetadataValues.filter(
-		(metadata) => metadata.fileMd5sum && (md5sumCounts.get(metadata.fileMd5sum) ?? 0) > 1,
+		(metadata) => metadata.fileMd5sum && (md5sumCounts.get(metadata.fileMd5sum.toLowerCase()) ?? 0) > 1,
 	);
 };
 
@@ -94,10 +95,10 @@ export const findSubmittedDuplicateMd5sums = (
 	existingFiles: SelectSubmissionFile[],
 	sequencingMetadataValues: SequencingMetadataType[],
 ): SequencingMetadataType[] => {
-	const existingMd5sums = new Set(existingFiles.flatMap(({ md5_sum }) => (md5_sum ? [md5_sum] : [])));
+	const existingMd5sums = new Set(existingFiles.flatMap(({ md5_sum }) => (md5_sum ? [md5_sum.toLowerCase()] : [])));
 
 	return sequencingMetadataValues.filter((metadata) => {
-		return metadata.fileMd5sum && existingMd5sums.has(metadata.fileMd5sum);
+		return metadata.fileMd5sum && existingMd5sums.has(metadata.fileMd5sum.toLowerCase());
 	});
 };
 
