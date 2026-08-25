@@ -35,49 +35,48 @@ export type SongSubmissionPayload = Record<string, any> & {
 };
 
 /**
- * Returns metadata entries whose file identifier occurs more than once in the input.
+ * Returns metadata entries whose key (as determined by the getKey function) occurs more than once in the input.
+ * @param sequencingMetadataValues - The sequencing metadata values to check for duplicates
+ * @param getKey - A function that returns the key to check for duplicates
+ * @returns An array of SequencingMetadataType entries that have duplicate keys
  */
-export const findDuplicateInputRecordIdentifier = (
+const findDuplicateMetadata = (
 	sequencingMetadataValues: SequencingMetadataType[],
+	getKey: (metadata: SequencingMetadataType) => string,
 ): SequencingMetadataType[] => {
-	const metadataWithIdentifiers = sequencingMetadataValues.map((metadata) => ({
+	const keyedMetadata = sequencingMetadataValues.map((metadata) => ({
 		metadata,
-		identifier: getIdentifierFromFileName(metadata.fileName).toLowerCase(),
+		key: getKey(metadata).toLowerCase(),
 	}));
-	const identifierCounts = metadataWithIdentifiers.reduce((counts, { identifier }) => {
-		return counts.set(identifier, (counts.get(identifier) ?? 0) + 1);
+	const keyCounts = keyedMetadata.reduce((counts, { key }) => {
+		if (key) {
+			counts.set(key, (counts.get(key) ?? 0) + 1);
+		}
+		return counts;
 	}, new Map<string, number>());
 
-	return metadataWithIdentifiers
-		.filter(({ identifier }) => (identifierCounts.get(identifier) ?? 0) > 1)
-		.map(({ metadata }) => metadata);
+	return keyedMetadata.filter(({ key }) => key && (keyCounts.get(key) ?? 0) > 1).map(({ metadata }) => metadata);
 };
+
+/**
+ * Returns metadata entries whose file identifier occurs more than once in the input.
+ */
+export const findDuplicateRecordIdentifiersInMetadata = (
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] =>
+	findDuplicateMetadata(sequencingMetadataValues, (metadata) => getIdentifierFromFileName(metadata.fileName));
 
 /**
  * Returns metadata entries whose file MD5 sum occurs more than once in the input.
  */
-export const findDuplicateInputMd5sum = (
+export const findDuplicateMd5SumsInMetadata = (
 	sequencingMetadataValues: SequencingMetadataType[],
-): SequencingMetadataType[] => {
-	const md5sumCounts = sequencingMetadataValues
-		.filter((metadata) => metadata.fileMd5sum)
-		.reduce((counts, metadata) => {
-			if (metadata.fileMd5sum) {
-				const normalizedMd5sum = metadata.fileMd5sum.toLowerCase();
-				return counts.set(normalizedMd5sum, (counts.get(normalizedMd5sum) ?? 0) + 1);
-			}
-			return counts;
-		}, new Map<string, number>());
-
-	return sequencingMetadataValues.filter(
-		(metadata) => metadata.fileMd5sum && (md5sumCounts.get(metadata.fileMd5sum.toLowerCase()) ?? 0) > 1,
-	);
-};
+): SequencingMetadataType[] => findDuplicateMetadata(sequencingMetadataValues, (metadata) => metadata.fileMd5sum ?? '');
 
 /**
  * Returns sequencing metadata whose Record identifier is already present in submitted files.
  */
-export const findSubmittedDuplicateRecordIdentifiers = (
+export const findPreviouslySubmittedRecordIdentifierMatches = (
 	existingFiles: SelectSubmissionFile[],
 	sequencingMetadataValues: SequencingMetadataType[],
 ): SequencingMetadataType[] => {
@@ -91,7 +90,7 @@ export const findSubmittedDuplicateRecordIdentifiers = (
 	});
 };
 
-export const findSubmittedDuplicateMd5sums = (
+export const findPreviouslySubmittedMd5SumMatches = (
 	existingFiles: SelectSubmissionFile[],
 	sequencingMetadataValues: SequencingMetadataType[],
 ): SequencingMetadataType[] => {
@@ -109,7 +108,7 @@ export const findSubmittedDuplicateMd5sums = (
  * @param batchName - The name of the batch, used in the error message if already submitted files are found
  * @returns A BatchError if already submitted files are found, otherwise undefined
  */
-export const getDuplicateRecordIdentifierInSubmissionError = (
+export const buildDuplicateRecordIdentifierErrors = (
 	existingFiles: SelectSubmissionFile[],
 	sequencingMetadataValues: SequencingMetadataType[],
 	batchName?: string,
@@ -117,7 +116,7 @@ export const getDuplicateRecordIdentifierInSubmissionError = (
 	const errors: BatchError[] = [];
 
 	// User input request check for duplicate identifiers in the same request
-	const duplicateIdentifiers = findDuplicateInputRecordIdentifier(sequencingMetadataValues);
+	const duplicateIdentifiers = findDuplicateRecordIdentifiersInMetadata(sequencingMetadataValues);
 	if (duplicateIdentifiers.length) {
 		errors.push({
 			message: `The following files have duplicate identifier values: ${duplicateIdentifiers.map((metadata) => metadata.fileName).join(', ')}`,
@@ -127,7 +126,7 @@ export const getDuplicateRecordIdentifierInSubmissionError = (
 	}
 
 	// Check for duplicate identifiers in the existing submitted files
-	const foundDuplicates = findSubmittedDuplicateRecordIdentifiers(existingFiles, sequencingMetadataValues);
+	const foundDuplicates = findPreviouslySubmittedRecordIdentifierMatches(existingFiles, sequencingMetadataValues);
 	if (foundDuplicates.length) {
 		errors.push({
 			message: `The following files have already been submitted for this submission: ${foundDuplicates.map((file) => file.fileName).join(', ')}`,
@@ -146,7 +145,7 @@ export const getDuplicateRecordIdentifierInSubmissionError = (
  * @param batchName - The name of the batch, used in the error message
  * @returns A BatchError if duplicate MD5 sums are found, otherwise undefined
  */
-export const getDuplicateFileMd5sumError = (
+export const buildDuplicateMd5SumErrors = (
 	existingFiles: SelectSubmissionFile[],
 	sequencingMetadataValues: SequencingMetadataType[],
 	batchName?: string,
@@ -154,18 +153,18 @@ export const getDuplicateFileMd5sumError = (
 	const errors: BatchError[] = [];
 
 	// User input request check for duplicate MD5 sums in the same request
-	const duplicateMd5sums = findDuplicateInputMd5sum(sequencingMetadataValues);
+	const duplicateMd5Sums = findDuplicateMd5SumsInMetadata(sequencingMetadataValues);
 
-	if (duplicateMd5sums.length) {
+	if (duplicateMd5Sums.length) {
 		errors.push({
-			message: `The following files have duplicate MD5 sums: ${duplicateMd5sums.map((metadata) => metadata.fileName).join(', ')}`,
+			message: `The following files have duplicate MD5 sums: ${duplicateMd5Sums.map((metadata) => metadata.fileName).join(', ')}`,
 			type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
 			batchName: batchName || '',
 		});
 	}
 
 	// Check for duplicate MD5 sums in the existing submitted files
-	const duplicatedFiles = findSubmittedDuplicateMd5sums(existingFiles, sequencingMetadataValues);
+	const duplicatedFiles = findPreviouslySubmittedMd5SumMatches(existingFiles, sequencingMetadataValues);
 
 	if (duplicatedFiles.length) {
 		errors.push({

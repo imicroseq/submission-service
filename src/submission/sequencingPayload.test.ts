@@ -22,14 +22,14 @@ import { suite, test } from 'node:test';
 
 import type { SelectSubmissionFile } from '../db/schemas/record_analysis_map.js';
 import {
+	buildDuplicateMd5SumErrors,
+	buildDuplicateRecordIdentifierErrors,
 	buildSongSubmissionPayload,
 	extractInsertRecordValues,
-	findDuplicateInputMd5sum,
-	findDuplicateInputRecordIdentifier,
-	findSubmittedDuplicateMd5sums,
-	findSubmittedDuplicateRecordIdentifiers,
-	getDuplicateFileMd5sumError,
-	getDuplicateRecordIdentifierInSubmissionError,
+	findDuplicateMd5SumsInMetadata,
+	findDuplicateRecordIdentifiersInMetadata,
+	findPreviouslySubmittedMd5SumMatches,
+	findPreviouslySubmittedRecordIdentifierMatches,
 } from './sequencingPayload.js';
 import type { SequencingMetadataType } from './submitRequest.js';
 
@@ -57,19 +57,19 @@ const mappingSequencingMetadata = (
 	created_at: new Date(),
 });
 
-suite('findDuplicateInputRecordIdentifier', () => {
+suite('findDuplicateRecordIdentifiersInMetadata', () => {
 	test('returns every entry whose file identifier occurs more than once', () => {
 		const duplicateFirst = sequencingMetadata('SAMPLE001.fastq.gz', 'first-md5');
 		const unique = sequencingMetadata('SAMPLE002.fastq.gz', 'unique-md5');
 		const duplicateSecond = sequencingMetadata('SAMPLE001.bam', 'second-md5');
 
-		const result = findDuplicateInputRecordIdentifier([duplicateFirst, unique, duplicateSecond]);
+		const result = findDuplicateRecordIdentifiersInMetadata([duplicateFirst, unique, duplicateSecond]);
 
 		assert.deepEqual(result, [duplicateFirst, duplicateSecond]);
 	});
 
 	test('returns no files when every file identifier is unique', () => {
-		const result = findDuplicateInputRecordIdentifier([
+		const result = findDuplicateRecordIdentifiersInMetadata([
 			sequencingMetadata('SAMPLE001.fastq.gz', 'some-md5'),
 			sequencingMetadata('SAMPLE002.fastq.gz', 'another-md5'),
 		]);
@@ -77,20 +77,20 @@ suite('findDuplicateInputRecordIdentifier', () => {
 		assert.deepEqual(result, []);
 	});
 
-	test('treats repeated empty file identifiers as duplicates', () => {
-		const result = findDuplicateInputRecordIdentifier([
+	test('ignores empty file identifiers', () => {
+		const result = findDuplicateRecordIdentifiersInMetadata([
 			sequencingMetadata('', 'first-md5'),
 			sequencingMetadata('', 'second-md5'),
 		]);
 
-		assert.deepEqual(result, [sequencingMetadata('', 'first-md5'), sequencingMetadata('', 'second-md5')]);
+		assert.deepEqual(result, []);
 	});
 
 	test('matches identifiers without file extensions', () => {
 		const firstFile = sequencingMetadata('SAMPLE001.fastq.gz', 'first-md5');
 		const secondFile = sequencingMetadata('SAMPLE001.vcf.gz', 'second-md5');
 
-		const result = findDuplicateInputRecordIdentifier([firstFile, secondFile]);
+		const result = findDuplicateRecordIdentifiersInMetadata([firstFile, secondFile]);
 
 		assert.deepEqual(result, [firstFile, secondFile]);
 	});
@@ -99,7 +99,7 @@ suite('findDuplicateInputRecordIdentifier', () => {
 		const firstFile = sequencingMetadata('sample001.fastq.gz', 'first-md5');
 		const secondFile = sequencingMetadata('SAMPLE001.vcf.gz', 'second-md5');
 
-		assert.deepEqual(findDuplicateInputRecordIdentifier([firstFile, secondFile]), [firstFile, secondFile]);
+		assert.deepEqual(findDuplicateRecordIdentifiersInMetadata([firstFile, secondFile]), [firstFile, secondFile]);
 	});
 
 	test('preserves the input order when multiple identifiers are duplicated', () => {
@@ -108,7 +108,7 @@ suite('findDuplicateInputRecordIdentifier', () => {
 		const third = sequencingMetadata('SAMPLE001.bam', 'third-md5');
 		const fourth = sequencingMetadata('SAMPLE002.vcf', 'fourth-md5');
 
-		assert.deepEqual(findDuplicateInputRecordIdentifier([first, second, third, fourth]), [
+		assert.deepEqual(findDuplicateRecordIdentifiersInMetadata([first, second, third, fourth]), [
 			first,
 			second,
 			third,
@@ -117,13 +117,13 @@ suite('findDuplicateInputRecordIdentifier', () => {
 	});
 });
 
-suite('findDuplicateInputMd5sum', () => {
+suite('findDuplicateMd5SumsInMetadata', () => {
 	test('returns every entry whose non-empty MD5 sum occurs more than once', () => {
 		const first = sequencingMetadata('SAMPLE001.fastq.gz', 'duplicate-md5');
 		const unique = sequencingMetadata('SAMPLE002.fastq.gz', 'unique-md5');
 		const second = sequencingMetadata('SAMPLE003.fastq.gz', 'duplicate-md5');
 
-		assert.deepEqual(findDuplicateInputMd5sum([first, unique, second]), [first, second]);
+		assert.deepEqual(findDuplicateMd5SumsInMetadata([first, unique, second]), [first, second]);
 	});
 
 	test('ignores empty MD5 sums and returns no entries when all sums are unique', () => {
@@ -133,18 +133,18 @@ suite('findDuplicateInputMd5sum', () => {
 			sequencingMetadata('SAMPLE003.fastq.gz', ''),
 		];
 
-		assert.deepEqual(findDuplicateInputMd5sum(metadata), []);
+		assert.deepEqual(findDuplicateMd5SumsInMetadata(metadata), []);
 	});
 
 	test('matches duplicate MD5 sums case-insensitively', () => {
 		const first = sequencingMetadata('SAMPLE001.fastq.gz', 'AbC123');
 		const second = sequencingMetadata('SAMPLE002.fastq.gz', 'aBc123');
 
-		assert.deepEqual(findDuplicateInputMd5sum([first, second]), [first, second]);
+		assert.deepEqual(findDuplicateMd5SumsInMetadata([first, second]), [first, second]);
 	});
 });
 
-suite('findSubmittedDuplicateRecordIdentifiers', () => {
+suite('findPreviouslySubmittedRecordIdentifierMatches', () => {
 	test('matches record identifiers case-insensitively', () => {
 		const existingFiles = [
 			mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123'),
@@ -154,7 +154,7 @@ suite('findSubmittedDuplicateRecordIdentifiers', () => {
 		const matchingFile = sequencingMetadata('sAmPlE001.fastq.gz', 'ABC456');
 		const unmatchedFile = sequencingMetadata('SAMPLE002.fastq.gz', 'DEF456');
 
-		const result = findSubmittedDuplicateRecordIdentifiers(existingFiles, [matchingFile, unmatchedFile]);
+		const result = findPreviouslySubmittedRecordIdentifierMatches(existingFiles, [matchingFile, unmatchedFile]);
 
 		assert.deepEqual(result, [matchingFile, unmatchedFile]);
 	});
@@ -168,7 +168,7 @@ suite('findSubmittedDuplicateRecordIdentifiers', () => {
 		const unmatchedFile1 = sequencingMetadata('SAMPLE001.fastq.gz', 'a1234');
 		const unmatchedFile2 = sequencingMetadata('SAMPLE002.fastq.gz', 'b456');
 
-		const result = findSubmittedDuplicateRecordIdentifiers(existingFiles, [unmatchedFile1, unmatchedFile2]);
+		const result = findPreviouslySubmittedRecordIdentifierMatches(existingFiles, [unmatchedFile1, unmatchedFile2]);
 
 		assert.deepEqual(result, [unmatchedFile1, unmatchedFile2]);
 	});
@@ -178,14 +178,14 @@ suite('findSubmittedDuplicateRecordIdentifiers', () => {
 		const firstMatch = sequencingMetadata('SAMPLE001.fastq.gz', 'first-md5');
 		const secondMatch = sequencingMetadata('sample001.bam', 'second-md5');
 
-		assert.deepEqual(findSubmittedDuplicateRecordIdentifiers(existingFiles, [firstMatch, secondMatch]), [
+		assert.deepEqual(findPreviouslySubmittedRecordIdentifierMatches(existingFiles, [firstMatch, secondMatch]), [
 			firstMatch,
 			secondMatch,
 		]);
 	});
 });
 
-suite('findSubmittedDuplicateMd5sums', () => {
+suite('findPreviouslySubmittedMd5SumMatches', () => {
 	test('returns new files whose non-empty MD5 sums already exist', () => {
 		const existingFiles = [
 			mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123'),
@@ -195,7 +195,7 @@ suite('findSubmittedDuplicateMd5sums', () => {
 		const emptyMd5File = sequencingMetadata('SAMPLE004.fastq.gz', '');
 		const unmatchedFile = sequencingMetadata('SAMPLE005.fastq.gz', 'def456');
 
-		assert.deepEqual(findSubmittedDuplicateMd5sums(existingFiles, [matchingFile, emptyMd5File, unmatchedFile]), [
+		assert.deepEqual(findPreviouslySubmittedMd5SumMatches(existingFiles, [matchingFile, emptyMd5File, unmatchedFile]), [
 			matchingFile,
 		]);
 	});
@@ -209,26 +209,25 @@ suite('findSubmittedDuplicateMd5sums', () => {
 		const emptyMd5File = sequencingMetadata('SAMPLE004.fastq.gz', '');
 		const unmatchedFile = sequencingMetadata('SAMPLE005.fastq.gz', 'def456');
 
-		assert.deepEqual(findSubmittedDuplicateMd5sums(existingFiles, [matchingFile, emptyMd5File, unmatchedFile]), [
+		assert.deepEqual(findPreviouslySubmittedMd5SumMatches(existingFiles, [matchingFile, emptyMd5File, unmatchedFile]), [
 			matchingFile,
 		]);
 	});
 
 	test('returns no files when there are no existing files or matching MD5 sums', () => {
-		assert.deepEqual(findSubmittedDuplicateMd5sums([], [sequencingMetadata('SAMPLE001.fastq.gz', 'abc123')]), []);
+		assert.deepEqual(
+			findPreviouslySubmittedMd5SumMatches([], [sequencingMetadata('SAMPLE001.fastq.gz', 'abc123')]),
+			[],
+		);
 	});
 });
 
-suite('getDuplicateRecordIdentifierInSubmissionError', () => {
+suite('buildDuplicateRecordIdentifierErrors', () => {
 	test('returns a batch error when metadata files were already submitted for the active submission', () => {
 		const existingFiles = [mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123')];
 		const submittedMetadata = [sequencingMetadata('SAMPLE001.fastq.gz', 'ABC123')];
 
-		const result = getDuplicateRecordIdentifierInSubmissionError(
-			existingFiles,
-			submittedMetadata,
-			'main-file.fastq.gz',
-		);
+		const result = buildDuplicateRecordIdentifierErrors(existingFiles, submittedMetadata, 'main-file.fastq.gz');
 
 		assert.deepEqual(result, [
 			{
@@ -243,7 +242,7 @@ suite('getDuplicateRecordIdentifierInSubmissionError', () => {
 		const existingFiles = [mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123')];
 		const metadata = [sequencingMetadata('SAMPLE002.fastq.gz', 'DEF456')];
 
-		const result = getDuplicateRecordIdentifierInSubmissionError(existingFiles, metadata, 'main-file.fastq.gz');
+		const result = buildDuplicateRecordIdentifierErrors(existingFiles, metadata, 'main-file.fastq.gz');
 
 		assert.deepEqual(result, []);
 	});
@@ -254,7 +253,7 @@ suite('getDuplicateRecordIdentifierInSubmissionError', () => {
 		const existingFiles = [mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'existing-md5')];
 
 		assert.deepEqual(
-			getDuplicateRecordIdentifierInSubmissionError(existingFiles, [duplicate, duplicateWithDifferentExtension]),
+			buildDuplicateRecordIdentifierErrors(existingFiles, [duplicate, duplicateWithDifferentExtension]),
 			[
 				{
 					message: 'The following files have duplicate identifier values: SAMPLE001.fastq.gz, SAMPLE001.bam',
@@ -272,12 +271,12 @@ suite('getDuplicateRecordIdentifierInSubmissionError', () => {
 	});
 });
 
-suite('getDuplicateFileMd5sumError', () => {
+suite('buildDuplicateMd5SumErrors', () => {
 	test('returns an input duplicate MD5 error', () => {
 		const first = sequencingMetadata('SAMPLE001.fastq.gz', 'duplicate-md5');
 		const second = sequencingMetadata('SAMPLE002.fastq.gz', 'duplicate-md5');
 
-		assert.deepEqual(getDuplicateFileMd5sumError([], [first, second], 'batch.tsv'), [
+		assert.deepEqual(buildDuplicateMd5SumErrors([], [first, second], 'batch.tsv'), [
 			{
 				message: 'The following files have duplicate MD5 sums: SAMPLE001.fastq.gz, SAMPLE002.fastq.gz',
 				type: 'INCORRECT_SECTION',
@@ -290,7 +289,7 @@ suite('getDuplicateFileMd5sumError', () => {
 		const metadata = sequencingMetadata('SAMPLE001.fastq.gz', 'abc123');
 		const existingFiles = [mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', 'abc123')];
 
-		assert.deepEqual(getDuplicateFileMd5sumError(existingFiles, [metadata]), [
+		assert.deepEqual(buildDuplicateMd5SumErrors(existingFiles, [metadata]), [
 			{
 				message: 'The following files have duplicate MD5 sums: SAMPLE001.fastq.gz',
 				type: 'INCORRECT_SECTION',
@@ -304,11 +303,11 @@ suite('getDuplicateFileMd5sumError', () => {
 		const second = sequencingMetadata('SAMPLE002.fastq.gz', 'duplicate-md5');
 		const existingFiles = [mappingSequencingMetadata(1, 'system-1', 'SAMPLE003', 'ANALYSIS001', 'duplicate-md5')];
 
-		assert.equal(getDuplicateFileMd5sumError(existingFiles, [first, second]).length, 2);
+		assert.equal(buildDuplicateMd5SumErrors(existingFiles, [first, second]).length, 2);
 	});
 
 	test('returns no errors when MD5 sums are unique and not previously submitted', () => {
-		assert.deepEqual(getDuplicateFileMd5sumError([], [sequencingMetadata('SAMPLE001.fastq.gz', 'unique-md5')]), []);
+		assert.deepEqual(buildDuplicateMd5SumErrors([], [sequencingMetadata('SAMPLE001.fastq.gz', 'unique-md5')]), []);
 	});
 });
 

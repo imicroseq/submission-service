@@ -28,10 +28,7 @@ import { lyricProvider } from '@/core/provider.js';
 import { validateRequest } from '@/middleware/requestValidation.js';
 import { fetchSubmissionFilesByMd5sum, fetchSubmissionFilesBySubmissionId } from '@/service/fileService.js';
 import { prevalidateNewDataFile } from '@/submission/fileValidation.js';
-import {
-	getDuplicateFileMd5sumError,
-	getDuplicateRecordIdentifierInSubmissionError,
-} from '@/submission/sequencingPayload.js';
+import { buildDuplicateMd5SumErrors, buildDuplicateRecordIdentifierErrors } from '@/submission/sequencingPayload.js';
 import { handleSequencingMetadataSubmission, handleSubmission } from '@/submission/submissionHandler.js';
 import {
 	type ErrorResponse,
@@ -85,7 +82,7 @@ export const submit = validateRequest(
 					? await fetchSubmissionFilesBySubmissionId(activeSubmission.id)
 					: [];
 
-				const duplicateRecordIdentifierErrors = getDuplicateRecordIdentifierInSubmissionError(
+				const duplicateRecordIdentifierErrors = buildDuplicateRecordIdentifierErrors(
 					existingSubmissionFiles,
 					sequencingMetadataValues,
 					submissionFile?.originalname,
@@ -102,7 +99,7 @@ export const submit = validateRequest(
 						.filter(Boolean);
 
 					const existingSubmissionFiles = await fetchSubmissionFilesByMd5sum(sequencingMetadataMd5sums, true);
-					const duplicateFileMd5sumError = getDuplicateFileMd5sumError(
+					const duplicateFileMd5sumError = buildDuplicateMd5SumErrors(
 						existingSubmissionFiles,
 						sequencingMetadataValues,
 						submissionFile?.originalname,
