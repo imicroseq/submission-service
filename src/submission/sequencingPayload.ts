@@ -71,7 +71,7 @@ export const findDuplicateRecordIdentifiersInMetadata = (
  */
 export const findDuplicateMd5SumsInMetadata = (
 	sequencingMetadataValues: SequencingMetadataType[],
-): SequencingMetadataType[] => findDuplicateMetadata(sequencingMetadataValues, (metadata) => metadata.fileMd5sum ?? '');
+): SequencingMetadataType[] => findDuplicateMetadata(sequencingMetadataValues, (metadata) => metadata.fileMd5sum);
 
 /**
  * Returns sequencing metadata whose Record identifier is already present in submitted files.
@@ -96,9 +96,7 @@ export const findPreviouslySubmittedMd5SumMatches = (
 ): SequencingMetadataType[] => {
 	const existingMd5sums = new Set(existingFiles.flatMap(({ md5_sum }) => (md5_sum ? [md5_sum.toLowerCase()] : [])));
 
-	return sequencingMetadataValues.filter((metadata) => {
-		return metadata.fileMd5sum && existingMd5sums.has(metadata.fileMd5sum.toLowerCase());
-	});
+	return sequencingMetadataValues.filter((metadata) => existingMd5sums.has(metadata.fileMd5sum.toLowerCase()));
 };
 
 /**

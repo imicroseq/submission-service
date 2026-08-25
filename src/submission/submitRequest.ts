@@ -37,7 +37,7 @@ const md5SumValidation = zod.string().regex(/^[a-fA-F0-9]{32}$/, {
 export const fileMetadataSchema = zod.object({
 	fileName: zod.string(),
 	fileSize: zod.coerce.number(),
-	fileMd5sum: md5SumValidation.optional(),
+	fileMd5sum: md5SumValidation,
 	fileAccess: zod.string(),
 	fileType: zod.string(),
 });

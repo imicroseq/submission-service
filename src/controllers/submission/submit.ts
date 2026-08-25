@@ -94,9 +94,7 @@ export const submit = validateRequest(
 
 				// Find MD5 duplicates in the database if duplicates are not allowed
 				if (!env.SEQUENCING_SUBMISSION_ALLOW_DUPLICATES) {
-					const sequencingMetadataMd5sums = sequencingMetadataValues
-						.map<string>((file) => file.fileMd5sum ?? '')
-						.filter(Boolean);
+					const sequencingMetadataMd5sums = sequencingMetadataValues.map((file) => file.fileMd5sum);
 
 					const existingSubmissionFiles = await fetchSubmissionFilesByMd5sum(sequencingMetadataMd5sums, true);
 					const duplicateFileMd5sumError = buildDuplicateMd5SumErrors(
