@@ -48,6 +48,18 @@ export const fetchSubmissionFilesBySubmissionId = async (submissionId: number) =
 };
 
 /**
+ * Retrieves files by their MD5 checksums
+ * @param md5sums An array of MD5 checksums to search for
+ * @param commitedOnly If true, only returns files that have been committed
+ * @returns A list of submission files matching the given MD5 checksums
+ */
+export const fetchSubmissionFilesByMd5sum = async (md5sums: string[], commitedOnly: boolean = false) => {
+	const db = getDbInstance();
+	const { getSubmissionFilesByMd5sum } = fileRepository(db);
+	return await getSubmissionFilesByMd5sum(md5sums, commitedOnly);
+};
+
+/**
  * Builds file metadata for all files mapped to a submission
  * @param organization
  * @param submissionId

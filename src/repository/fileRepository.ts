@@ -17,7 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
@@ -26,6 +26,33 @@ import { type InsertSubmissionFile, type SelectSubmissionFile, submissionFiles }
 
 export const fileRepository = (db: PostgresDb) => {
 	return {
+		/**
+		 * Retrieves submission files by their MD5 checksums
+		 * @param md5sums Array of MD5 checksums to search for
+		 * @param commitedOnly If true, only returns files that have been committed
+		 * @returns Array of matching submission files
+		 */
+		getSubmissionFilesByMd5sum: async (
+			md5sums: string[],
+			commitedOnly: boolean = false,
+		): Promise<SelectSubmissionFile[]> => {
+			try {
+				return await db
+					.select()
+					.from(submissionFiles)
+					.where(
+						and(
+							inArray(submissionFiles.md5_sum, md5sums),
+							commitedOnly ? isNotNull(submissionFiles.system_id) : undefined,
+						),
+					);
+			} catch (error) {
+				logger.error(error, 'Error querying submission files by MD5hashes.');
+				throw new lyricProvider.utils.errors.InternalServerError(
+					'Something went wrong while fetching files for submission. Please try again later.',
+				);
+			}
+		},
 		/**
 		 * Retrieves a submission file by its system ID
 		 * @param systemId The system Id of the submission file
