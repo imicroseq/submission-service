@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "\n==================  Build  ==================": "",
-    "build:compile": "rimraf dist && tsc",
+    "build:compile": "rimraf dist && tsc -p tsconfig.build.json",
     "build:copy:api-docs": "copyfiles src/api-docs/*.yml src/api-docs/**/*.yml dist/",
     "build:copy:db": "copyfiles \"migrations/**/*\" dist/",
     "build:all": "pnpm build:compile && pnpm build:copy:api-docs && pnpm db:generate && pnpm build:copy:db",
