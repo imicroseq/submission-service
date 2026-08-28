@@ -37,10 +37,8 @@ export const submissionFiles = schema.table(
 		index('submission_id_idx').on(table.submission_id),
 		index('system_id_idx').on(table.system_id),
 		index('md5_sum_idx')
-			.on(table.md5_sum, table.submission_id, table.record_identifier)
-			.where(
-				sql`${table.md5_sum} IS NOT NULL AND ${table.md5_sum} <> '' AND ${table.system_id} IS NOT NULL AND ${table.system_id} <> ''`,
-			),
+			.on(table.md5_sum, table.system_id)
+			.where(sql`${table.md5_sum} IS NOT NULL`),
 	],
 );
 

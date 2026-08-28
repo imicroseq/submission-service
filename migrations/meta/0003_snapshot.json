@@ -1,5 +1,5 @@
 {
-  "id": "6043c539-4dc1-4ea4-b510-99d670835bbe",
+  "id": "cc36e7ca-744d-4a7c-9e67-659dbe686cf0",
   "prevId": "2e627443-e322-4ddf-9471-40c9c27fcdfe",
   "version": "7",
   "dialect": "postgresql",
@@ -93,20 +93,14 @@
               "nulls": "last"
             },
             {
-              "expression": "submission_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "record_identifier",
+              "expression": "system_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "where": "\"submission\".\"record_analysis_map\".\"md5_sum\" IS NOT NULL AND \"submission\".\"record_analysis_map\".\"md5_sum\" <> '' AND \"submission\".\"record_analysis_map\".\"system_id\" IS NOT NULL AND \"submission\".\"record_analysis_map\".\"system_id\" <> ''",
+          "where": "\"submission\".\"record_analysis_map\".\"md5_sum\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
