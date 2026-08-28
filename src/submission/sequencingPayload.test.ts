@@ -46,7 +46,7 @@ const mappingSequencingMetadata = (
 	systemId: string,
 	recordIdentifier: string,
 	analysisId: string,
-	md5Sum: string,
+	md5Sum: string | null,
 ): SelectSubmissionFile => ({
 	id: 1,
 	system_id: systemId,
@@ -219,6 +219,20 @@ suite('findPreviouslySubmittedMd5SumMatches', () => {
 			findPreviouslySubmittedMd5SumMatches([], [sequencingMetadata('SAMPLE001.fastq.gz', 'abc123')]),
 			[],
 		);
+	});
+
+	test('ignores existing files with a null MD5 sum, as pre-migration rows have not been backfilled', () => {
+		const existingFiles = [
+			mappingSequencingMetadata(1, 'system-1', 'SAMPLE001', 'ANALYSIS001', null),
+			mappingSequencingMetadata(1, 'system-2', 'SAMPLE002', 'ANALYSIS002', null),
+			mappingSequencingMetadata(1, 'system-3', 'SAMPLE003', 'ANALYSIS003', 'abc123'),
+		];
+		const legacyFileResubmitted = sequencingMetadata('SAMPLE001.fastq.gz', 'anything');
+		const matchingFile = sequencingMetadata('SAMPLE003.fastq.gz', 'abc123');
+
+		assert.deepEqual(findPreviouslySubmittedMd5SumMatches(existingFiles, [legacyFileResubmitted, matchingFile]), [
+			matchingFile,
+		]);
 	});
 });
 
