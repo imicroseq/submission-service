@@ -29,12 +29,12 @@ export const fileRepository = (db: PostgresDb) => {
 		/**
 		 * Retrieves submission files by their MD5 checksums
 		 * @param md5sums Array of MD5 checksums to search for
-		 * @param commitedOnly If true, only returns files that have been committed
+		 * @param committedOnly If true, only returns files that have been committed
 		 * @returns Array of matching submission files
 		 */
 		getSubmissionFilesByMd5sum: async (
 			md5sums: string[],
-			commitedOnly: boolean = false,
+			committedOnly: boolean = false,
 		): Promise<SelectSubmissionFile[]> => {
 			try {
 				return await db
@@ -43,7 +43,7 @@ export const fileRepository = (db: PostgresDb) => {
 					.where(
 						and(
 							inArray(submissionFiles.md5_sum, md5sums),
-							commitedOnly ? isNotNull(submissionFiles.system_id) : undefined,
+							committedOnly ? isNotNull(submissionFiles.system_id) : undefined,
 						),
 					);
 			} catch (error) {
