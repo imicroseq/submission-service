@@ -17,6 +17,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import { sql } from 'drizzle-orm';
 import { index, integer, serial, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 import { schema } from './schema.js';
@@ -28,10 +29,17 @@ export const submissionFiles = schema.table(
 		submission_id: integer().notNull(),
 		record_identifier: varchar({ length: 255 }).notNull(),
 		analysis_id: varchar({ length: 255 }).notNull(),
+		md5_sum: varchar({ length: 255 }),
 		system_id: varchar({ length: 255 }),
 		created_at: timestamp().notNull().defaultNow(),
 	},
-	(table) => [index('submission_id_idx').on(table.submission_id), index('system_id_idx').on(table.system_id)],
+	(table) => [
+		index('submission_id_idx').on(table.submission_id),
+		index('system_id_idx').on(table.system_id),
+		index('md5_sum_idx')
+			.on(table.md5_sum, table.system_id)
+			.where(sql`${table.md5_sum} IS NOT NULL`),
+	],
 );
 
 export type SelectSubmissionFile = typeof submissionFiles.$inferSelect;

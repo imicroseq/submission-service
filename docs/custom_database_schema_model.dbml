@@ -15,6 +15,7 @@ Table submission.record_analysis_map {
     submission_id integer [not null]
     record_identifier varchar [not null]
     analysis_id varchar [not null]
+    md5_sum varchar
     system_id varchar
     created_at timestamp [default: `now()`]
 }

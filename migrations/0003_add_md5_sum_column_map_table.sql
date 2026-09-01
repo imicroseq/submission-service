@@ -1,0 +1,2 @@
+ALTER TABLE "submission"."record_analysis_map" ADD COLUMN "md5_sum" varchar(255);--> statement-breakpoint
+CREATE INDEX "md5_sum_idx" ON "submission"."record_analysis_map" USING btree ("md5_sum","system_id") WHERE "submission"."record_analysis_map"."md5_sum" IS NOT NULL;

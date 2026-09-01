@@ -24,6 +24,13 @@ standalone: yes
 fix: revisit once the Lyric dependency ships the version that gives more granular control over Submission data storage; until then there's no code change to make on this side
 standalone: yes
 
+The duplicate-md5/record-identifier check is read-then-decide with no lock or transaction around it: two concurrent requests submitting the same file can both read `record_analysis_map` before either has written its row, both pass the check, and both get submitted to Song, producing the exact duplicate this feature exists to prevent
+fix: wrap the check-then-insert sequence in a transaction at an appropriate isolation level (e.g. `SERIALIZABLE`) or an advisory lock keyed on `(submission_id, md5_sum)`. A DB-level `UNIQUE` constraint isn't an option: `SEQUENCING_SUBMISSION_ALLOW_DUPLICATES` makes duplicate MD5 sums legal by configuration, and a schema constraint can't be conditional on an environment variable. The `md5_sum` column and its index (`record_analysis_map.ts`) make this cheap to add now
+standalone: yes
+
+Duplicate MD5 detection is forward-only: `record_analysis_map` rows written before the `md5_sum` column existed have it as `NULL`, and the duplicate check skips falsy MD5 values to avoid false positives, so resubmitting any file that was submitted before this feature deployed passes uncaught
+fix: backfill `md5_sum` for existing rows from Song (`getAnalysisById(...).files[0].fileMd5sum`, the same field `buildSubmissionFileMetadata` already reads) via a one-off migration or script
+standalone: yes
 `allowedReadOrganizations` (`src/middleware/verifyEgoJwt.ts`) is hardcoded to an empty array; nothing reads it yet, but once a read-side authorization check is implemented against it, an empty collection is ambiguous between two meanings that need distinct representations: "no restriction configured" versus "restricted to nothing." Flagged during cross-project auth design discussion with Arranger/Usher: their own audit found that in Elasticsearch query construction, three of four idiomatic ways to encode "no grants" compile to match-all rather than match-nothing (a clause-less boolean is match-all, and query optimizers can flatten it out of the tree entirely), so this exact ambiguity is a live, previously-confirmed failure mode elsewhere in the same platform, not a hypothetical one
 fix: before implementing the read side, decide the representation for "no restriction" (e.g. `null`/`undefined`) versus "restricted to nothing" (e.g. `[]`) explicitly, and ensure whatever check consumes `allowedReadOrganizations` treats an empty array as fail-closed (deny all), not as an absence of restriction
 standalone: yes

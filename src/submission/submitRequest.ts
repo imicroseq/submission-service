@@ -19,7 +19,7 @@
 
 import type { ParamsDictionary } from 'express-serve-static-core';
 import type { ParsedQs } from 'qs';
-import { z, ZodError } from 'zod';
+import { z as zod, ZodError } from 'zod';
 
 import type { ActiveSubmissionStatus, BatchError } from '@overture-stack/lyric';
 
@@ -29,24 +29,29 @@ import type { RequestValidation } from '@/middleware/requestValidation.js';
 interface SubmitRequestPathParams extends ParamsDictionary {
 	categoryId: string;
 }
-export const fileMetadataSchema = z.object({
-	fileName: z.string(),
-	fileSize: z.coerce.number(),
-	fileMd5sum: z.string(),
-	fileAccess: z.string(),
-	fileType: z.string(),
+
+const md5SumValidation = zod.string().regex(/^[a-fA-F0-9]{32}$/, {
+	message: 'Invalid MD5 sum format. Must be a 32-character hexadecimal string.',
 });
-export type SequencingMetadataType = z.infer<typeof fileMetadataSchema>;
+
+export const fileMetadataSchema = zod.object({
+	fileName: zod.string(),
+	fileSize: zod.coerce.number(),
+	fileMd5sum: md5SumValidation,
+	fileAccess: zod.string(),
+	fileType: zod.string(),
+});
+export type SequencingMetadataType = zod.infer<typeof fileMetadataSchema>;
 
 export const submitRequestSchema: RequestValidation<
 	{ entityName: string; organization: string; sequencingMetadata?: string },
 	ParsedQs,
 	SubmitRequestPathParams
 > = {
-	body: z.object({
-		entityName: z.string(),
-		organization: z.string(),
-		sequencingMetadata: z
+	body: zod.object({
+		entityName: zod.string(),
+		organization: zod.string(),
+		sequencingMetadata: zod
 			.string()
 			.optional()
 			.superRefine((str, ctx) => {
@@ -60,13 +65,13 @@ export const submitRequestSchema: RequestValidation<
 				} catch (e) {
 					logger.error(e, 'Invalid JSON format');
 					ctx.addIssue({
-						code: z.ZodIssueCode.custom,
+						code: zod.ZodIssueCode.custom,
 						message: 'Invalid JSON format',
 					});
 					return;
 				}
 
-				const result = z.array(fileMetadataSchema).safeParse(parsed);
+				const result = zod.array(fileMetadataSchema).safeParse(parsed);
 				if (!result.success) {
 					logger.error(result.error, 'Zod error');
 					if (result.error instanceof ZodError) {
@@ -75,12 +80,12 @@ export const submitRequestSchema: RequestValidation<
 							.join(' | ');
 
 						ctx.addIssue({
-							code: z.ZodIssueCode.custom,
+							code: zod.ZodIssueCode.custom,
 							message: errorMessages,
 						});
 					} else {
 						ctx.addIssue({
-							code: z.ZodIssueCode.custom,
+							code: zod.ZodIssueCode.custom,
 							message: `Invalid JSON format. ${result.error}`,
 						});
 					}
@@ -88,8 +93,8 @@ export const submitRequestSchema: RequestValidation<
 			})
 			.optional(),
 	}),
-	pathParams: z.object({
-		categoryId: z.string(),
+	pathParams: zod.object({
+		categoryId: zod.string(),
 	}),
 };
 
@@ -101,7 +106,7 @@ export type ErrorResponse = {
 export type SubmissionManifest = {
 	objectId: string;
 	fileName: string;
-	md5Sum: string;
+	md5Sum?: string;
 };
 
 export type SubmitResponse = {

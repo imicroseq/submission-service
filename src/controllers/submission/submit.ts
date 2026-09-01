@@ -19,13 +19,16 @@
 
 import { type Response } from 'express';
 
-import { ACTIVE_SUBMISSION_STATUS, type BatchError } from '@overture-stack/lyric';
+import { ACTIVE_SUBMISSION_STATUS, type BatchError, type SubmissionSummary } from '@overture-stack/lyric';
 
 import { hasUserWriteAccess, shouldBypassAuth } from '@/common/auth.js';
+import { env } from '@/common/envConfig.js';
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { validateRequest } from '@/middleware/requestValidation.js';
+import { fetchSubmissionFilesByMd5sum, fetchSubmissionFilesBySubmissionId } from '@/service/fileService.js';
 import { prevalidateNewDataFile } from '@/submission/fileValidation.js';
+import { buildDuplicateMd5SumErrors, buildDuplicateRecordIdentifierErrors } from '@/submission/sequencingPayload.js';
 import { handleSequencingMetadataSubmission, handleSubmission } from '@/submission/submissionHandler.js';
 import {
 	type ErrorResponse,
@@ -60,17 +63,58 @@ export const submit = validateRequest(
 				});
 			}
 
+			if (!submissionFile && (!sequencingMetadataValues || sequencingMetadataValues.length === 0)) {
+				throw new lyricProvider.utils.errors.BadRequest(
+					'Missing submission file and sequencing metadata. Please provide at least one of these for processing.',
+				);
+			}
+
+			let activeSubmission: SubmissionSummary | undefined;
+
+			if (sequencingMetadataValues?.length) {
+				activeSubmission = await lyricProvider.services.submission.getActiveSubmissionByOrganization({
+					categoryId,
+					username: user?.username || '',
+					organization,
+				});
+
+				const existingSubmissionFiles = activeSubmission
+					? await fetchSubmissionFilesBySubmissionId(activeSubmission.id)
+					: [];
+
+				const duplicateRecordIdentifierErrors = buildDuplicateRecordIdentifierErrors(
+					existingSubmissionFiles,
+					sequencingMetadataValues,
+					submissionFile?.originalname,
+				);
+
+				if (duplicateRecordIdentifierErrors.length) {
+					return respondWithInvalidSubmission(res, activeSubmission?.id, duplicateRecordIdentifierErrors);
+				}
+
+				// Find MD5 duplicates in the database if duplicates are not allowed
+				if (!env.SEQUENCING_SUBMISSION_ALLOW_DUPLICATES) {
+					const sequencingMetadataMd5sums = sequencingMetadataValues.map((file) => file.fileMd5sum);
+
+					const existingSubmissionFiles = await fetchSubmissionFilesByMd5sum(sequencingMetadataMd5sums, true);
+					const duplicateFileMd5sumError = buildDuplicateMd5SumErrors(
+						existingSubmissionFiles,
+						sequencingMetadataValues,
+						submissionFile?.originalname,
+					);
+
+					if (duplicateFileMd5sumError.length) {
+						return respondWithInvalidSubmission(res, activeSubmission?.id, duplicateFileMd5sumError);
+					}
+				}
+			}
+
 			if (!submissionFile) {
 				if (!sequencingMetadataValues || sequencingMetadataValues.length === 0) {
 					throw new lyricProvider.utils.errors.BadRequest(
 						'The "submissionFile" parameter is missing or empty. Please include a file in the request for processing.',
 					);
 				}
-				const activeSubmission = await lyricProvider.services.submission.getActiveSubmissionByOrganization({
-					categoryId,
-					username: user?.username || '',
-					organization,
-				});
 
 				if (!activeSubmission) {
 					throw new lyricProvider.utils.errors.BadRequest(
@@ -165,6 +209,7 @@ const respondWithInvalidSubmission = (
 	submissionId: number | undefined,
 	errors: BatchError[],
 ): Response<SubmitResponse> => {
+	logger.info(`Invalid submission ${submissionId}: ${JSON.stringify(errors.map((error) => error.message))}`);
 	return res.status(200).send({
 		submissionId,
 		status: ACTIVE_SUBMISSION_STATUS.INVALID_SUBMISSION,

@@ -17,7 +17,11 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import { BATCH_ERROR_TYPE, type BatchError } from '@overture-stack/lyric';
+
+import type { SelectSubmissionFile } from '@/db/schemas/record_analysis_map.js';
 import type { SequencingMetadataType } from '@/submission/submitRequest.js';
+import { getIdentifierFromFileName } from '@/utils/file.js';
 
 import { buildFileMetadata } from './fileValidation.js';
 import { convertRecordToPayload, prefixKeys } from './populateTemplate.js';
@@ -25,6 +29,151 @@ import { convertRecordToPayload, prefixKeys } from './populateTemplate.js';
 // This template is used to convert the sequencing metadata into a payload to Song
 const SEQUENCING_TEMPLATE = 'sequencing_payload.json' as const;
 const DATA_PREFIX = 'data.' as const;
+
+export type SongSubmissionPayload = Record<string, any> & {
+	files: SequencingMetadataType[];
+};
+
+/**
+ * Returns metadata entries whose key (as determined by the getKey function) occurs more than once in the input.
+ * @param sequencingMetadataValues - The sequencing metadata values to check for duplicates
+ * @param getKey - A function that returns the key to check for duplicates
+ * @returns An array of SequencingMetadataType entries that have duplicate keys
+ */
+const findDuplicateMetadata = (
+	sequencingMetadataValues: SequencingMetadataType[],
+	getKey: (metadata: SequencingMetadataType) => string,
+): SequencingMetadataType[] => {
+	const keyedMetadata = sequencingMetadataValues.map((metadata) => ({
+		metadata,
+		key: getKey(metadata).toLowerCase(),
+	}));
+	const keyCounts = keyedMetadata.reduce((counts, { key }) => {
+		if (key) {
+			counts.set(key, (counts.get(key) ?? 0) + 1);
+		}
+		return counts;
+	}, new Map<string, number>());
+
+	return keyedMetadata.filter(({ key }) => key && (keyCounts.get(key) ?? 0) > 1).map(({ metadata }) => metadata);
+};
+
+/**
+ * Returns metadata entries whose file identifier occurs more than once in the input.
+ */
+export const findDuplicateRecordIdentifiersInMetadata = (
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] =>
+	findDuplicateMetadata(sequencingMetadataValues, (metadata) => getIdentifierFromFileName(metadata.fileName));
+
+/**
+ * Returns metadata entries whose file MD5 sum occurs more than once in the input.
+ */
+export const findDuplicateMd5SumsInMetadata = (
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] => findDuplicateMetadata(sequencingMetadataValues, (metadata) => metadata.fileMd5sum);
+
+/**
+ * Returns sequencing metadata whose Record identifier is already present in submitted files.
+ */
+export const findPreviouslySubmittedRecordIdentifierMatches = (
+	existingFiles: SelectSubmissionFile[],
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] => {
+	const existingIdentifiers = new Set(
+		existingFiles.flatMap(({ record_identifier }) => (record_identifier ? [record_identifier.toLowerCase()] : [])),
+	);
+
+	return sequencingMetadataValues.filter((metadata) => {
+		const identifier = getIdentifierFromFileName(metadata.fileName).toLowerCase();
+		return existingIdentifiers.has(identifier);
+	});
+};
+
+export const findPreviouslySubmittedMd5SumMatches = (
+	existingFiles: SelectSubmissionFile[],
+	sequencingMetadataValues: SequencingMetadataType[],
+): SequencingMetadataType[] => {
+	const existingMd5sums = new Set(existingFiles.flatMap(({ md5_sum }) => (md5_sum ? [md5_sum.toLowerCase()] : [])));
+
+	return sequencingMetadataValues.filter((metadata) => existingMd5sums.has(metadata.fileMd5sum.toLowerCase()));
+};
+
+/**
+ * Returns a BatchError if sequencing metadata files have already been submitted for the same Record identifier.
+ * @param existingFiles - The existing submitted files
+ * @param sequencingMetadataValues - The user input Request of new sequencing metadata values
+ * @param batchName - The name of the batch, used in the error message if already submitted files are found
+ * @returns A BatchError if already submitted files are found, otherwise undefined
+ */
+export const buildDuplicateRecordIdentifierErrors = (
+	existingFiles: SelectSubmissionFile[],
+	sequencingMetadataValues: SequencingMetadataType[],
+	batchName?: string,
+): BatchError[] => {
+	const errors: BatchError[] = [];
+
+	// User input request check for duplicate identifiers in the same request
+	const duplicateIdentifiers = findDuplicateRecordIdentifiersInMetadata(sequencingMetadataValues);
+	if (duplicateIdentifiers.length) {
+		errors.push({
+			message: `The following files have duplicate identifier values: ${duplicateIdentifiers.map((metadata) => metadata.fileName).join(', ')}`,
+			type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+			batchName: batchName || '',
+		});
+	}
+
+	// Check for duplicate identifiers in the existing submitted files
+	const foundDuplicates = findPreviouslySubmittedRecordIdentifierMatches(existingFiles, sequencingMetadataValues);
+	if (foundDuplicates.length) {
+		errors.push({
+			message: `The following files have already been submitted for this submission: ${foundDuplicates.map((file) => file.fileName).join(', ')}`,
+			type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+			batchName: batchName || '',
+		});
+	}
+
+	return errors;
+};
+
+/**
+ * Returns a BatchError if sequencing metadata files have already been committed with the same MD5 sum.
+ * @param existingFiles - The existing committed files with matching MD5 sums
+ * @param sequencingMetadataValues - The sequencing metadata values to check against existing files
+ * @param batchName - The name of the batch, used in the error message
+ * @returns A BatchError if duplicate MD5 sums are found, otherwise undefined
+ */
+export const buildDuplicateMd5SumErrors = (
+	existingFiles: SelectSubmissionFile[],
+	sequencingMetadataValues: SequencingMetadataType[],
+	batchName?: string,
+): BatchError[] => {
+	const errors: BatchError[] = [];
+
+	// User input request check for duplicate MD5 sums in the same request
+	const duplicateMd5Sums = findDuplicateMd5SumsInMetadata(sequencingMetadataValues);
+
+	if (duplicateMd5Sums.length) {
+		errors.push({
+			message: `The following files have duplicate MD5 sums: ${duplicateMd5Sums.map((metadata) => metadata.fileName).join(', ')}`,
+			type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+			batchName: batchName || '',
+		});
+	}
+
+	// Check for duplicate MD5 sums in the existing submitted files
+	const duplicatedFiles = findPreviouslySubmittedMd5SumMatches(existingFiles, sequencingMetadataValues);
+
+	if (duplicatedFiles.length) {
+		errors.push({
+			message: `The following files have duplicate MD5 sums: ${duplicatedFiles.map((metadata) => metadata.fileName).join(', ')}`,
+			type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
+			batchName: batchName || '',
+		});
+	}
+
+	return errors;
+};
 
 /**
  * Builds the Song payload based on the Sequencing files Metadata
@@ -41,8 +190,8 @@ export const buildSongSubmissionPayload = ({
 	extractedData: Record<string, string>[];
 	organization: string;
 	fileNameIdentifier: string;
-}): Record<string, any>[] => {
-	const songSubmissionData: Record<string, any>[] = [];
+}): SongSubmissionPayload[] => {
+	const songSubmissionData: SongSubmissionPayload[] = [];
 	// Convert Sequencing metadata to payload
 	for (const filesMetadata of sequencingFilesMetadata) {
 		const matchedRecord = extractedData.find((record) => record[fileNameIdentifier] === filesMetadata.identifier);
@@ -52,9 +201,11 @@ export const buildSongSubmissionPayload = ({
 		}
 
 		const prefixedRecord = prefixKeys(matchedRecord, DATA_PREFIX);
-		const songPayload = convertRecordToPayload({ organization, ...prefixedRecord }, SEQUENCING_TEMPLATE);
 		// TODO: Handle multiple files by same identifier
-		songPayload.files = [buildFileMetadata(filesMetadata)];
+		const songPayload: SongSubmissionPayload = {
+			...convertRecordToPayload({ organization, ...prefixedRecord }, SEQUENCING_TEMPLATE),
+			files: [buildFileMetadata(filesMetadata)], // Only 1s sequencing file per record is expected, but we can extend this in the future if needed
+		};
 
 		songSubmissionData.push(songPayload);
 	}
