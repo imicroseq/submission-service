@@ -217,6 +217,7 @@ export const buildSequencingFilesMetadata = (
  */
 export const buildFileMetadata = (file: SequencingMetadataType & { identifier: string }): SequencingMetadataType => {
 	return {
+		dataType: file.fileType,
 		fileName: file.fileName,
 		fileSize: file.fileSize,
 		fileMd5sum: file.fileMd5sum,
