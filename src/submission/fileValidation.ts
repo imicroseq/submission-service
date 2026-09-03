@@ -213,19 +213,6 @@ export const buildSequencingFilesMetadata = (
 };
 
 /**
- * Converters the Sequencing metadata to a payload format.
- */
-export const buildFileMetadata = (file: SequencingMetadataType & { identifier: string }): SequencingMetadataType => {
-	return {
-		fileName: file.fileName,
-		fileSize: file.fileSize,
-		fileMd5sum: file.fileMd5sum,
-		fileAccess: file.fileAccess,
-		fileType: file.fileType,
-	};
-};
-
-/**
  * This function checks that every required field in the schema exists in the file headers,
  * matching whether as field displayName or field name.
  * Returns the fields that are missing
