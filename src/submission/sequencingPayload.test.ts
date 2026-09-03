@@ -34,7 +34,6 @@ import {
 import type { SequencingMetadataType } from './submitRequest.js';
 
 const sequencingMetadata = (fileName: string, fileMd5sum: string): SequencingMetadataType => ({
-	dataType: 'FASTQ',
 	fileName,
 	fileSize: 100,
 	fileMd5sum,
@@ -357,7 +356,6 @@ suite('buildSongSubmissionPayload', () => {
 		const result = buildSongSubmissionPayload({
 			sequencingFilesMetadata: [
 				{
-					dataType: 'FASTQ',
 					fileName: 'SAMPLE001.fastq.gz',
 					fileSize: 100,
 					fileMd5sum: 'abc123',
@@ -378,7 +376,6 @@ suite('buildSongSubmissionPayload', () => {
 		const result = buildSongSubmissionPayload({
 			sequencingFilesMetadata: [
 				{
-					dataType: 'FASTQ',
 					fileName: 'SAMPLE001.fastq.gz',
 					fileSize: 100,
 					fileMd5sum: 'abc123',

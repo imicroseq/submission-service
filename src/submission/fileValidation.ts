@@ -27,6 +27,7 @@ import { asArray } from '@/utils/format.js';
 
 import { getSeparatorCharacter } from './format.js';
 import { readHeaders } from './readFile.js';
+import type { SongFileMetadata } from './sequencingPayload.js';
 
 /**
  * Pre-validates a new data file before submission.
@@ -215,7 +216,7 @@ export const buildSequencingFilesMetadata = (
 /**
  * Converters the Sequencing metadata to a payload format.
  */
-export const buildFileMetadata = (file: SequencingMetadataType & { identifier: string }): SequencingMetadataType => {
+export const buildFileMetadata = (file: SequencingMetadataType & { identifier: string }): SongFileMetadata => {
 	return {
 		dataType: file.fileType,
 		fileName: file.fileName,

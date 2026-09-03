@@ -30,8 +30,10 @@ import { convertRecordToPayload, prefixKeys } from './populateTemplate.js';
 const SEQUENCING_TEMPLATE = 'sequencing_payload.json' as const;
 const DATA_PREFIX = 'data.' as const;
 
+export type SongFileMetadata = SequencingMetadataType & { dataType: string };
+
 export type SongSubmissionPayload = Record<string, any> & {
-	files: SequencingMetadataType[];
+	files: SongFileMetadata[];
 };
 
 /**
