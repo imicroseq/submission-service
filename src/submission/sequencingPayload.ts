@@ -23,7 +23,6 @@ import type { SelectSubmissionFile } from '@/db/schemas/record_analysis_map.js';
 import type { SequencingMetadataType } from '@/submission/submitRequest.js';
 import { getIdentifierFromFileName } from '@/utils/file.js';
 
-import { buildFileMetadata } from './fileValidation.js';
 import { convertRecordToPayload, prefixKeys } from './populateTemplate.js';
 
 // This template is used to convert the sequencing metadata into a payload to Song
@@ -34,6 +33,21 @@ export type SongFileMetadata = SequencingMetadataType & { dataType: string };
 
 export type SongSubmissionPayload = Record<string, any> & {
 	files: SongFileMetadata[];
+};
+
+/**
+ * Converts the sequencing metadata a submitter provided into the file shape Song expects,
+ * deriving `dataType`, which is required by Song and is not part of the submission request.
+ */
+export const buildFileMetadata = (file: SequencingMetadataType & { identifier: string }): SongFileMetadata => {
+	return {
+		dataType: file.fileType,
+		fileName: file.fileName,
+		fileSize: file.fileSize,
+		fileMd5sum: file.fileMd5sum,
+		fileAccess: file.fileAccess,
+		fileType: file.fileType,
+	};
 };
 
 /**
