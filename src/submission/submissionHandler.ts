@@ -126,8 +126,15 @@ const submitSongPayload = async (
 				md5_sum: record.files[0]?.fileMd5sum,
 			});
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error ?? 'Unknown error');
+
+			const fileName = record.files?.[0]?.fileName ?? 'unknown file';
+			const duplicateSongError = 'AnalysisServiceImpl::info.already.exists';
+
 			songErrors.push({
-				message: error?.toString() || 'Unknown error',
+				message: errorMessage.includes(duplicateSongError)
+					? `Duplicate MD5 detected for sequencing file: ${fileName}`
+					: errorMessage || 'Unknown error',
 				type: BATCH_ERROR_TYPE.INCORRECT_SECTION,
 				batchName,
 			});
@@ -262,7 +269,16 @@ export async function handleSubmission({
 
 	if (!songSubmissionResult.success) {
 		logger.info(`Song submission failed. Cancelling active submission ID '${lyricSubmitResult.submissionId}}'`);
-		await lyricProvider.services.submission.deleteActiveSubmissionById(lyricSubmitResult.submissionId, username, false);
+
+		try {
+			await lyricProvider.services.submission.deleteActiveSubmissionById(
+				lyricSubmitResult.submissionId,
+				username,
+				false,
+			);
+		} catch (error) {
+			logger.error(`Failed to delete active submission ID '${lyricSubmitResult.submissionId}': ${error}`);
+		}
 
 		return songSubmissionResult;
 	}
