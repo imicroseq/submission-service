@@ -237,3 +237,99 @@ export const publishAnalysis = async (
 		throw new Error('Invalid JSON in retriving Analysis response');
 	}
 };
+
+/**
+ * Deletes files from SONG service by their object IDs
+ * @param organization
+ * @param objectIds
+ * @returns a string if files are successfully deleted. Otherwise, throws an error with details
+ */
+export const deleteFiles = async (organization: string, objectIds: string[]) => {
+	logger.debug(`Deleting files with object IDs '${objectIds.join(', ')}'`);
+
+	const apiUrl = new URL(`/studies/${organization}/files/${objectIds.join(',')}`, env.SEQUENCING_SUBMISSION_URL);
+	const response = await fetchWithAuth(apiUrl.toString(), {
+		method: 'DELETE',
+	});
+
+	if (!response.ok) {
+		let message = `Delete files failed with status '${response.status}'`;
+		try {
+			const errorBody = await response.json();
+			const errorDetail = typeof errorBody?.message === 'string' ? errorBody.message : JSON.stringify(errorBody);
+			message += `: ${errorDetail}`;
+		} catch {
+			message += `: Failed to parse error response`;
+		}
+		logger.error(message);
+		throw new Error(message);
+	}
+
+	const textResponse = await response.text();
+	logger.debug(`Response deleting files '${objectIds.join(', ')}': ${textResponse}`);
+	return textResponse;
+};
+
+/**
+ * Suppresses an Analysis in SONG service
+ * @param organization
+ * @param analysisId
+ * @returns a string if analysis is successfully suppressed. Otherwise, throws an error with details
+ */
+export const suppressAnalysis = async (organization: string, analysisId: string) => {
+	logger.debug(`Suppressing analysis ID '${analysisId}'`);
+
+	const apiUrl = new URL(`/studies/${organization}/analysis/suppress/${analysisId}`, env.SEQUENCING_SUBMISSION_URL);
+	const response = await fetchWithAuth(apiUrl.toString(), {
+		method: 'PUT',
+	});
+
+	if (!response.ok) {
+		let message = `Suppress analysis failed with status '${response.status}'`;
+		try {
+			const errorBody = await response.json();
+			const errorDetail = typeof errorBody?.message === 'string' ? errorBody.message : JSON.stringify(errorBody);
+			message += `: ${errorDetail}`;
+		} catch {
+			message += `: Failed to parse error response`;
+		}
+		logger.error(message);
+		throw new Error(message);
+	}
+
+	const textResponse = await response.text();
+	logger.debug(`Response suppressing analysis id '${analysisId}': ${textResponse}`);
+	return textResponse;
+};
+
+/**
+ * Unpublishes an Analysis in SONG service
+ * @param organization
+ * @param analysisId
+ * @returns a string if analysis is successfully unpublished. Otherwise, throws an error with details
+ */
+export const unpublishAnalysis = async (organization: string, analysisId: string) => {
+	logger.debug(`Unpublishing analysis ID '${analysisId}'`);
+
+	const apiUrl = new URL(`/studies/${organization}/analysis/unpublish/${analysisId}`, env.SEQUENCING_SUBMISSION_URL);
+	const response = await fetchWithAuth(apiUrl.toString(), {
+		method: 'PUT',
+	});
+
+	if (!response.ok) {
+		let message = `Unpublish analysis failed with status '${response.status}'`;
+		try {
+			const errorBody = await response.json();
+			const errorDetail = typeof errorBody?.message === 'string' ? errorBody.message : JSON.stringify(errorBody);
+			message += `: ${errorDetail}`;
+		} catch {
+			message += `: Failed to parse error response`;
+		}
+		logger.error(message);
+		throw new Error(message);
+	}
+
+	const textResponse = await response.text();
+	logger.debug(`Response unpublishing analysis id '${analysisId}': ${textResponse}`);
+	return textResponse;
+};

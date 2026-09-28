@@ -24,6 +24,7 @@ import { errorHandler } from '@overture-stack/lyric';
 
 import { env } from '@/common/envConfig.js';
 import { commit } from '@/controllers/submission/commit.js';
+import { deleteSubmission } from '@/controllers/submission/deleteSubmission.js';
 import { editData } from '@/controllers/submission/editData.js';
 import { getSubmissionById } from '@/controllers/submission/getSubmissionById.js';
 import { submit } from '@/controllers/submission/submit.js';
@@ -38,6 +39,7 @@ export const submissionRouter: Router = (() => {
 	const router = express.Router();
 
 	router.get('/:submissionId', authMiddleware, getSubmissionById);
+	router.delete('/:submissionId', authMiddleware, deleteSubmission);
 	router.post('/category/:categoryId/data', authMiddleware, upload.single('submissionFile'), submit);
 	router.post('/category/:categoryId/commit/:submissionId', authMiddleware, commit);
 	router.put('/category/:categoryId/data', authMiddleware, upload.array('files'), editData);
