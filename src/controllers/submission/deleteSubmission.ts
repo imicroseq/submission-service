@@ -33,7 +33,7 @@ import { env } from '@/common/envConfig.js';
 import logger from '@/common/logger.js';
 import { lyricProvider } from '@/core/provider.js';
 import { type RequestValidation, validateRequest } from '@/middleware/requestValidation.js';
-import { removeMappedSubmissionFiles } from '@/service/fileService.js';
+import { suppressMappedSubmissionAnalyses } from '@/service/fileService.js';
 
 interface DeleteSubmissionPathParams extends ParamsDictionary {
 	submissionId: string;
@@ -60,10 +60,10 @@ export const DeleteSubmissionRequestSchema: RequestValidation<
 };
 
 /**
- * Closes a Submission, removing the sequencing files submitted to Song before closing it in Lyric.
+ * Closes a Submission, suppressing its sequencing analyses in Song before closing it in Lyric.
  * Active Submissions (OPEN, VALID, INVALID) can always be closed.
  * Submissions stuck in process (VALIDATING, COMMITTING) can only be closed with `force`.
- * CLOSED Submissions can be closed again with `force`, to clean up the files left in Song.
+ * CLOSED Submissions can be closed again with `force`, to suppress the analyses left in Song.
  * COMMITTED Submissions cannot be closed, even with `force`.
  */
 export const deleteSubmission = validateRequest(
@@ -113,11 +113,14 @@ export const deleteSubmission = validateRequest(
 			}
 
 			if (env.SEQUENCING_SUBMISSION_ENABLED) {
-				const resultRemoveSubmissionFiles = await removeMappedSubmissionFiles(submission.organization, submission.id);
+				const resultSuppressSubmissionAnalyses = await suppressMappedSubmissionAnalyses(
+					submission.organization,
+					submission.id,
+				);
 
-				if (!resultRemoveSubmissionFiles.success) {
+				if (!resultSuppressSubmissionAnalyses.success) {
 					throw new lyricProvider.utils.errors.InternalServerError(
-						`Cannot close submission. Files with analysis IDs ${resultRemoveSubmissionFiles.failed} failed to be removed`,
+						`Cannot close submission. Files with analysis IDs ${resultSuppressSubmissionAnalyses.failed} failed to be suppressed`,
 					);
 				}
 			}

@@ -239,38 +239,6 @@ export const publishAnalysis = async (
 };
 
 /**
- * Deletes files from SONG service by their object IDs
- * @param organization
- * @param objectIds
- * @returns a string if files are successfully deleted. Otherwise, throws an error with details
- */
-export const deleteFiles = async (organization: string, objectIds: string[]) => {
-	logger.debug(`Deleting files with object IDs '${objectIds.join(', ')}'`);
-
-	const apiUrl = new URL(`/studies/${organization}/files/${objectIds.join(',')}`, env.SEQUENCING_SUBMISSION_URL);
-	const response = await fetchWithAuth(apiUrl.toString(), {
-		method: 'DELETE',
-	});
-
-	if (!response.ok) {
-		let message = `Delete files failed with status '${response.status}'`;
-		try {
-			const errorBody = await response.json();
-			const errorDetail = typeof errorBody?.message === 'string' ? errorBody.message : JSON.stringify(errorBody);
-			message += `: ${errorDetail}`;
-		} catch {
-			message += `: Failed to parse error response`;
-		}
-		logger.error(message);
-		throw new Error(message);
-	}
-
-	const textResponse = await response.text();
-	logger.debug(`Response deleting files '${objectIds.join(', ')}': ${textResponse}`);
-	return textResponse;
-};
-
-/**
  * Suppresses an Analysis in SONG service
  * @param organization
  * @param analysisId

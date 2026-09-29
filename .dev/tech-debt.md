@@ -55,12 +55,12 @@ Once per-submission access levels are settable after submission (per the develop
 fix: when designing where/how access-level changes get set, decide explicitly whether changing one requires this service to trigger an immediate reindex/invalidation signal rather than relying on Maestro's normal pipeline timing; needs coordination with whoever owns the Maestro indexing trigger, not a fix in this repo alone
 standalone: no
 
-A forced close (`force=true`) of a Submission stuck VALIDATING or COMMITTING removes its Song files and closes it, without checking whether the Lyric worker is actually stuck or still running. If a COMMITTING worker is still alive, it can finish after the close and commit records in Lyric whose Song analyses were just suppressed. `force` has no admin-only check, so any user with write access to the organization can do this
+A forced close (`force=true`) of a Submission stuck VALIDATING or COMMITTING suppresses its Song analyses and closes it, without checking whether the Lyric worker is actually stuck or still running. If a COMMITTING worker is still alive, it can finish after the close and commit records in Lyric whose Song analyses were just suppressed. `force` has no admin-only check, so any user with write access to the organization can do this
 fix: if this becomes a problem, only allow `force` once the Submission's `updatedAt` is older than a staleness threshold (`getSubmissionById.ts` already uses a 10-minute `STALE_SUBMISSION_THRESHOLD_MS` for polling), and/or restrict `force` to admins
 standalone: yes
 
-`removeMappedSubmissionFiles` (`fileService.ts`) and the `deleteSubmission` controller have no test coverage. Both import `@/core/provider.js` transitively, so the provider-hang entry above blocks testing them
-fix: covered by the orchestration-layer testing entry above; include the close flow (UNPUBLISHED analyses get their files deleted and are suppressed, PUBLISHED ones are unpublished first, VALIDATING/COMMITTING/CLOSED require `force`, COMMITTED returns 409 even with `force`, invalid `force` values return 400, a Song failure blocks the close and a retry is idempotent) when that mocking layer exists
+`suppressMappedSubmissionAnalyses` (`fileService.ts`) and the `deleteSubmission` controller have no test coverage. Both import `@/core/provider.js` transitively, so the provider-hang entry above blocks testing them
+fix: covered by the orchestration-layer testing entry above; include the close flow (UNPUBLISHED analyses are suppressed, PUBLISHED ones are unpublished first, VALIDATING/COMMITTING/CLOSED require `force`, COMMITTED returns 409 even with `force`, invalid `force` values return 400, a Song failure blocks the close and a retry is idempotent) when that mocking layer exists
 standalone: no
 
 `pnpm lint` fails on `main` with 11 existing errors (prettier indentation in the `submitted-data` controllers, `preserve-caught-error` in `populateTemplate.ts`, `no-useless-assignment` in `submitRequest.ts`), unrelated to any recent feature

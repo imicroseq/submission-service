@@ -21,13 +21,7 @@ import logger from '@/common/logger.js';
 import type { FileMetadata } from '@/controllers/submission/getSubmissionById.js';
 import { getDbInstance } from '@/db/index.js';
 import { fileRepository } from '@/repository/fileRepository.js';
-import {
-	deleteFiles,
-	getAnalysisById,
-	publishAnalysis,
-	suppressAnalysis,
-	unpublishAnalysis,
-} from '@/submission/song.js';
+import { getAnalysisById, publishAnalysis, suppressAnalysis, unpublishAnalysis } from '@/submission/song.js';
 
 /**
  * Retrieves file by system ID via the mapping table
@@ -140,44 +134,39 @@ export const publishMappedSubmissionFiles = async (organization: string, submiss
 };
 
 /**
- * Removes from SONG service all the files linked to a submission
+ * Suppresses in SONG service all the analyses linked to a submission
  *
  * This function retrieves all mapped files for the specified submission,
- * then deletes the files of each analysis and suppresses the analysis.
- * PUBLISHED analyses are unpublished first, as files can only be deleted from an UNPUBLISHED analysis.
+ * then suppresses the analysis of each one. Files are not deleted, as SONG requires an analysis
+ * to contain at least one file.
+ * PUBLISHED analyses are unpublished first.
  * Analyses already SUPPRESSED are skipped, so the operation can be safely retried.
- * If any removal attempt fails, it records the failure but continues processing the rest.
+ * If any attempt fails, it records the failure but continues processing the rest.
  * @param organization
  * @param submissionId
  * @returns An object containing:
- *   - `success`: `true` if all analyses were removed successfully; otherwise `false`.
- *   - `removed`: A list of analysis IDs that were successfully removed.
- *   - `failed`: A list of analysis IDs that failed to be removed.
+ *   - `success`: `true` if all analyses were suppressed successfully; otherwise `false`.
+ *   - `suppressed`: A list of analysis IDs that were successfully suppressed.
+ *   - `failed`: A list of analysis IDs that failed to be suppressed.
  */
-export const removeMappedSubmissionFiles = async (organization: string, submissionId: number) => {
+export const suppressMappedSubmissionAnalyses = async (organization: string, submissionId: number) => {
 	const mappedFiles = await fetchSubmissionFilesBySubmissionId(submissionId);
 
-	const analysisRemoved: string[] = [];
+	const analysisSuppressed: string[] = [];
 	const analysisFailed: string[] = [];
 	for (const file of mappedFiles) {
 		try {
 			const analysis = await getAnalysisById(organization, file.analysis_id);
 
 			if (analysis.analysisState === 'PUBLISHED') {
-				// Files can only be deleted from an UNPUBLISHED analysis
 				await unpublishAnalysis(organization, file.analysis_id);
 			}
 
 			if (analysis.analysisState !== 'SUPPRESSED') {
-				// Files must be deleted before suppressing, as a SUPPRESSED analysis can't be modified
-				const objectIds = analysis.files.map((analysisFile) => analysisFile.objectId);
-				if (objectIds.length) {
-					await deleteFiles(organization, objectIds);
-				}
 				await suppressAnalysis(organization, file.analysis_id);
 			}
 
-			analysisRemoved.push(file.analysis_id);
+			analysisSuppressed.push(file.analysis_id);
 		} catch {
 			analysisFailed.push(file.analysis_id);
 		}
@@ -187,13 +176,13 @@ export const removeMappedSubmissionFiles = async (organization: string, submissi
 
 	logger.info(
 		allSuccessful
-			? `Successfully removed ${analysisRemoved.length}/${mappedFiles.length} analyses for submission ID '${submissionId}'`
-			: `Removed ${analysisRemoved.length}/${mappedFiles.length} analyses for submission ID '${submissionId}'. Failed: '${analysisFailed.join(', ')}'`,
+			? `Successfully suppressed ${analysisSuppressed.length}/${mappedFiles.length} analyses for submission ID '${submissionId}'`
+			: `Suppressed ${analysisSuppressed.length}/${mappedFiles.length} analyses for submission ID '${submissionId}'. Failed: '${analysisFailed.join(', ')}'`,
 	);
 
 	return {
 		success: allSuccessful,
-		removed: analysisRemoved,
+		suppressed: analysisSuppressed,
 		failed: analysisFailed,
 	};
 };
