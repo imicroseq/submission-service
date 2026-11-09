@@ -26,6 +26,13 @@ components:
           schema:
             $ref: '#/components/responses/Error'
 
+    ContentTooLarge:
+      description: Error response indicating that an uploaded file exceeds the size limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/responses/Error'
+
     Error:
       type: object
       properties:
@@ -34,7 +41,7 @@ components:
           description: Error type
         message:
           type: string
-          decription: Description of the error
+          description: Description of the error
 
     Forbidden:
       description: Error response indicating invalid access due to inadequate permissions

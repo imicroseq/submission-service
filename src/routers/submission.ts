@@ -20,7 +20,7 @@
 import express, { type Router } from 'express';
 import multer from 'multer';
 
-import { errorHandler } from '@overture-stack/lyric';
+import { convertUploadErrors, errorHandler } from '@overture-stack/lyric';
 
 import { env } from '@/common/envConfig.js';
 import { commit } from '@/controllers/submission/commit.js';
@@ -41,6 +41,7 @@ export const submissionRouter: Router = (() => {
 	router.post('/category/:categoryId/data', authMiddleware, upload.single('submissionFile'), submit);
 	router.post('/category/:categoryId/commit/:submissionId', authMiddleware, commit);
 	router.put('/category/:categoryId/data', authMiddleware, upload.array('files'), editData);
+	router.use(convertUploadErrors);
 
 	router.post('/category/:categoryId/files', (req, res) => {
 		// The endpoint for files upload provided by Lyric should be disabled.

@@ -283,6 +283,8 @@
         $ref: '#/components/responses/UnauthorizedError'
       403:
         $ref: '#/components/responses/Forbidden'
+      413:
+        $ref: '#/components/responses/ContentTooLarge'
       500:
         $ref: '#/components/responses/ServerError'
       503:
@@ -324,6 +326,8 @@
         $ref: '#/components/responses/UnauthorizedError'
       403:
         $ref: '#/components/responses/Forbidden'
+      413:
+        $ref: '#/components/responses/ContentTooLarge'
       500:
         $ref: '#/components/responses/ServerError'
       503:
