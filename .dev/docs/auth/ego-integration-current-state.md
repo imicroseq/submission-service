@@ -19,7 +19,7 @@ For a route with `authMiddleware` applied directly:
 3. `isValidTokenPayload` requires `context.user.status === 'APPROVED'`.
 4. The decoded token maps into Lyric's `UserSessionResult`: `isAdmin` from an exact scope-string match against `AUTH_PERMISSION_ADMIN`; `allowedWriteOrganizations` from scopes that start with `AUTH_PERMISSION_PREFIX_ORG` and end with `AUTH_PERMISSION_SUFFIX_ORG`, with both stripped off to yield the organization name; `allowedReadOrganizations` is hardcoded to `[]`, unconditionally, read-scoping was never implemented.
 5. On success, `req.user` is set and the request proceeds. On any failure, `authMiddleware` returns `401` (no token) or `403` (invalid token) directly, before the route handler runs.
-6. Separately, the write controllers (`src/controllers/submission/submit.ts:56`, `commit.ts:60`, `editData.ts:65`) call `hasUserWriteAccess(organization, user)` (`common/auth.ts`) as a second, per-organization check. Read controllers do not do an equivalent per-organization check.
+6. Separately, the write controllers (`src/controllers/submission/submit.ts:59`, `commit.ts:60`, `editData.ts:65`) call `hasUserWriteAccess(organization, user)` (`common/auth.ts`) as a second, per-organization check. Read controllers do not do an equivalent per-organization check.
 
 `shouldBypassAuth` (`common/auth.ts`) has two independent ways to return `true`: `AUTH_ENABLED=false` globally, or the request's HTTP method not being in `AUTH_PROTECT_METHODS` (default list is `POST,PUT,DELETE`, so `GET` bypasses auth by default configuration even when `AUTH_ENABLED=true`).
 
@@ -31,9 +31,33 @@ For a route with `authMiddleware` applied directly:
 
 Directly wrapped with `authMiddleware` (`src/routers/submission.ts:40-43`, `src/routers/submittedData.ts:37-40`): every route this repo defines in those two routers.
 
+Attaching `authMiddleware` to a route does not by itself authenticate it, because `shouldBypassAuth` consults the request method. So the read-side requirement has two parts that must both hold: every read route authenticates its requester whatever the method, and every read route authorizes what it returns against that requester's entitlements. The query endpoint (`byQuery`) is the natural first place to enforce the second part, since it already authenticates its requester and has a single point where a filter can be composed.
+
 Not gated by this repo's own middleware at all: `/health` and `/api-docs` (`src/server.ts:58,68`), unauthenticated by design.
 
-Mounted with no `authMiddleware` in `server.ts` (lines 61-65): `/audit`, `/category`, `/dictionary` → `lyricProvider.routers.*`, and the fallthrough `router.use('', lyricProvider.routers.submission)` / `.submittedData` inside `submission.ts:49` and `submittedData.ts:42`. These run inside `@overture-stack/lyric` library code. Because `provider.ts` passes the same `verifyToken`, `AUTH_ENABLED`, and `AUTH_PROTECT_METHODS` into Lyric's own `AppConfig.auth`, these routes very likely get the same EGO check applied internally by Lyric, using the same flags, not a separate or absent one. This wasn't verified against Lyric's own router source in this pass, flagging it as an assumption rather than a confirmed fact: worth checking `@overture-stack/lyric`'s source directly before relying on it for a security-relevant design decision.
+Mounted with no `authMiddleware` in `server.ts` (lines 61-65): `/audit`, `/category`, `/dictionary` → `lyricProvider.routers.*`, and the fallthrough `router.use('', lyricProvider.routers.submission)` / `.submittedData` inside `submission.ts:50` and `submittedData.ts:42`. These run inside `@overture-stack/lyric` library code. Because `provider.ts` passes the same `verifyToken`, `AUTH_ENABLED`, and `AUTH_PROTECT_METHODS` into Lyric's own `AppConfig.auth`, these routes get the same check. Verified against Lyric 0.22.0's router source: the audit, category, dictionary, submission and submitted-data routers each apply Lyric's own auth middleware, built from the `AppConfig.auth` this repo passes in, so they run the same verification function under the same `AUTH_ENABLED` and `AUTH_PROTECT_METHODS`, and skip authentication for methods outside that list exactly as this repo's middleware does, except dictionary registration and category alias changes, which require an administrator on every method while auth is enabled. So any read requirement this service adopts has to cover these routers as well as its own handlers: they inherit this service's authentication settings, and authorization over what they return is not something they add on their own.
+
+## Caller-supplied query filters (SQON)
+
+Relevant to authorization because a filter is the mechanism a read-side access check would most naturally use, so it matters what filter machinery already exists and who controls it.
+
+SQON is available here through Lyric rather than through anything this repo implements: `lyricProvider.utils.convertSqonToQuery.parseSQON`, typed and validated in `src/common/validation.ts/common.ts` (`sqonSchema` is a zod custom validator that simply calls `parseSQON` inside a try/catch) and consumed at exactly one endpoint, `POST /data/category/:categoryId/organization/:organization/query` (`src/controllers/submitted-data/getSubmittedDataByQuery.ts`).
+
+Three requirements follow for access control on that path:
+
+- **A server-side filter is composed over the caller's.** The caller's SQON is parsed and handed to `getSubmittedDataByOrganization(..., { entityName, view, sqon })`, which is the point where an access filter has to be combined with it, never replaced by it or trusted in its place. Arranger's caller-supplied filter callback, which its access filter is composed with, is the model to follow.
+- **An organization named in the request is checked against the requester's entitlements**, rather than treated as scoping on its own.
+- **Filterable fields are restricted deliberately, if any should not be filterable.** Validation today is structural (`sqonSchema` accepts anything `parseSQON` accepts), so a restriction has to be added rather than assumed; an allowlist tied to the active dictionary is the obvious form.
+
+Two facts about the dialect, for anyone evaluating a filter representation shared with Arranger. Lyric uses `fieldName`, the Arranger v3 property name, despite depending on `@overture-stack/sqon-builder@^1.1.0`; that package is deprecated in favour of `@overture-stack/sqon` in the Arranger monorepo, so the reference in this repo's own `data-api.yml` is stale even though the compatibility conclusion holds. The real constraint is the operator set: Lyric supports `in`, `gt`, `lt` plus the `and`/`or`/`not` combinators, which is narrower than Arranger's.
+
+## The value trust boundary
+
+Submitted record values pass through this service unsanitized: `readFile.ts` trims them and unwraps Excel quoting, nothing more; `prevalidateNewDataFile` checks headers and required-field presence, not values. Value-level validation is delegated entirely to Lectern dictionary rules, which do not constrain the contents of a free-text field.
+
+So values arriving at Lyric's storage and query layers are caller-controlled, and this service's safety on that path rests on how the dependency constructs its queries rather than on anything here. Worth knowing when evaluating a Lyric upgrade, since it means a change in that dependency's query construction changes this service's exposure without any change here.
+
+Recorded deliberately as a boundary to understand rather than a gap to close: sanitizing values at ingestion would be the wrong layer, corrupting legitimate submitter data to compensate for query construction that belongs downstream. Parameterization at the point of query construction is the correct control, and it is not this repo's to implement.
 
 ## Abstraction boundary
 
@@ -52,4 +76,4 @@ None. The repository's only test file is `src/submission/sequencingPayload.test.
 
 ## Existing plans
 
-None recorded at initial writing. Superseded by a cross-project review with Arranger and Usher (2026-08-19), which surfaced five concrete findings now filed in `.dev/tech-debt.md`: no read authorization at any layer by default configuration (live, not hypothetical), a cross-service token-confusion risk from the missing `iss`/`aud` check, the write-authorization seam being a followed convention rather than a structural requirement, the `allowedReadOrganizations` empty-array ambiguity, and a low-priority verify-then-decode fragility in `verifyEgoJwt.ts`. `.dev/roadmap.md` still has no active or parked initiatives; the read-authorization intent question (world-readable by design, or an unfinished feature) needs a developer decision before it becomes one.
+The read requirements the Usher migration has to satisfy, and the decision behind them, are in the read-authorization entry of `.dev/tech-debt.md`, alongside the other auth entries. `.dev/roadmap.md` plans characterization tests for the HTTP surface, which will show whether a Lyric upgrade or the Usher read rules change what this service returns.
