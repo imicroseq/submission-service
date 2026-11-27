@@ -12,16 +12,14 @@ services:
       - POSTGRES_DB=lyric
   lectern_mongo:
     container_name: submission.lectern.db
-    image: bitnamilegacy/mongodb:4.0
+    image: mongo:8.3.17
     ports:
       - 27017:27017
     volumes:
-      - vs_mongodb_data:/bitnami
+      - vs_mongodb_data:/data/db
     environment:
-      MONGODB_USERNAME: admin
-      MONGODB_PASSWORD: password
-      MONGODB_DATABASE: lectern
-      MONGODB_ROOT_PASSWORD: secret_password
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
   lectern_service:
     container_name: submission.lectern.service
     image: ghcr.io/overture-stack/lectern:2.0.0
@@ -30,7 +28,7 @@ services:
     environment:
       MONGO_HOST: lectern_mongo
       MONGO_PORT: 27017
-      MONGO_DB: lectern
+      MONGO_DB: admin
       MONGO_USER: admin
       MONGO_PASS: password
 volumes:
